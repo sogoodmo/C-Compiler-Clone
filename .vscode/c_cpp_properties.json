@@ -3,7 +3,8 @@
         {
             "name": "Linux",
             "includePath": [
-                "${workspaceFolder}/**"
+                "${workspaceFolder}/**",
+                "/modules/cs325/llvm-15.0.0/include/**"
             ],
             "defines": [],
             "compilerPath": "/usr/local/bin/arm-none-eabi-gcc",

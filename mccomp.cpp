@@ -132,7 +132,6 @@ static TOKEN returnTok(std::string lexVal, int tok_type) {
 // and reset column number to 0
 /// gettok - Return the next token from standard input.
 static TOKEN gettok() {
-
   static int LastChar = ' ';
   static int NextChar = ' ';
 
