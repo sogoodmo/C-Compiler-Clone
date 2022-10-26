@@ -1,0 +1,227 @@
+FIRST: {"extern","int","float","bool","void"}
+FOLLOW: {}
+program ::= extern_list decl_list 
+            | decl_list
+
+FIRST: {"extern", epsilon}
+FOLLOW: {"int","float","bool","void"}
+extern_list ::= extern extern_list_prime 
+
+
+FIRST: {"extern", epsilon}
+FOLLOW: {"int","float","bool","void"}
+extern_list_prime ::= extern extern_list_prime 
+            | epsilon
+
+FIRST: {"extern"}
+FOLLOW: {"int","float","bool","void", "extern"}
+extern ::= "extern" type_spec IDENT "(" params ")" ";"
+
+FIRST: {"int","float","bool","void"}
+FOLLOW: {}
+decl_list ::= decl decl_list_prime 
+
+FIRST: {"int","float","bool","void" epsilon}
+FOLLOW: {}
+decl_list_prime ::= decl decl_list_prime | epsilon
+
+# ========
+# Without left factoring 
+
+FIRST: {"int","float","bool","void"}
+FOLLOW: {"int","float","bool","void"}
+decl ::= var_decl | fun_decl 
+
+
+# With left factoring 
+# FIRST: {"int","float","bool", "void"}
+# FOLLOW: {}
+# decl ::= var_type IDENT decl_prime | "void" IDENT "(" params ")" block
+
+# FIRST: {";", "("}
+# FOLLOW: {}
+# decl_prime ::= ";" | "(" params ")" block
+# =============
+FIRST: {"int","float","bool"}
+FOLLOW: {"int","float","bool","void"}
+var_decl ::= var_type IDENT ";" 
+
+FIRST: {"void","int","float","bool"}
+FOLLOW: {IDENT}
+type_spec ::= "void" | var_type       
+
+FIRST: {"int","float","bool"}
+FOLLOW: {IDENT}
+var_type  ::= "int" |  "float" |  "bool"
+
+FIRST: {"void","int","float","bool"}
+FOLLOW: {"int","float","bool","void"}
+fun_decl ::= type_spec IDENT "(" params ")" block
+
+FIRST: {"void",epsilon,"int","float","bool"}
+FOLLOW: {")"}
+params ::= param_list  
+        |  "void" | epsilon
+
+FIRST: {"int","float","bool"}
+FOLLOW: {")"}
+param_list ::= param param_list_prime 
+
+FIRST: {",",epsilon}
+FOLLOW: {")"}
+param_list_prime ::= "," param param_list_prime | epsilon
+
+FIRST: {"int","float","bool"}
+FOLLOW: {',',")"}
+param ::= var_type IDENT
+
+FIRST: {"{"}
+FOLLOW: {"else",";","{","if","while","return",IDENT,"-","!","(",INT_LIT,FLOAT_LIT,BOOL_LIT,"}","void","int","float","bool"}
+block ::= "{" local_decls stmt_list "}"
+
+FIRST: {"int","float","bool", epsilon}
+FOLLOW: {";","{","if","while","return",IDENT,"-","!","(",INT_LIT,FLOAT_LIT,BOOL_LIT,"}"}
+local_decls ::= local_decl local_decls | epsilon
+
+FIRST: {"int","float","bool"}
+FOLLOW: {"int","float","bool",";","{","if","while","return",IDENT,"-","!","(",INT_LIT,FLOAT_LIT,BOOL_LIT,"}"}
+local_decl ::= var_type IDENT ";"
+
+FIRST: {"{","if","while","else",IDENT,"-", ";", "!","(",INT_LIT,FLOAT_LIT,BOOL_LIT,epsilon}
+FOLLOW: {"}"}
+stmt_list ::= stmt stmt_list | epsilon 
+
+FIRST: {"{","if","while","else",IDENT,"-", ";", "!","(",INT_LIT,FLOAT_LIT,BOOL_LIT}
+FOLLOW: {";","{","if","while","return",IDENT,"-","!","(",INT_LIT,FLOAT_LIT,BOOL_LIT,"}"}
+stmt ::= expr_stmt 
+            |  block 
+            |  if_stmt 
+            |  while_stmt 
+            |  return_stmt
+
+FIRST: {"-", "!","(",INT_LIT,FLOAT_LIT,BOOL_LIT,IDENT,";"}
+FOLLOW: {";","{","if","while","return",IDENT,"-","!","(",INT_LIT,FLOAT_LIT,BOOL_LIT,"}"}
+expr_stmt ::= expr ";" | ";"
+
+FIRST: {"while"}
+FOLLOW: {";","{","if","while","return",IDENT,"-","!","(",INT_LIT,FLOAT_LIT,BOOL_LIT,"}"}
+while_stmt ::= "while" "(" expr ")" stmt 
+
+FIRST: {"if"}
+FOLLOW: {";","{","if","while","return",IDENT,"-","!","(",INT_LIT,FLOAT_LIT,BOOL_LIT,"}"}
+if_stmt ::= "if" "(" expr ")" block else_stmt
+
+FIRST: {"else", epsilon}
+FOLLOW: {";","{","if","while","return",IDENT,"-","!","(",INT_LIT,FLOAT_LIT,BOOL_LIT,"}"}
+else_stmt  ::= "else" block | epsilon
+
+
+# ======
+# Without left factoring 
+FIRST: {"return"}
+FOLLOW: {";","{","if","while","return",IDENT,"-","!","(",INT_LIT,FLOAT_LIT,BOOL_LIT,"}"}
+return_stmt ::= "return" ";" | "return" expr ";"
+
+# With left factoring 
+# FIRST: {"return"}
+# FOLLOW: {}
+# return_stmt ::= "return" return_stmt_prime 
+
+# FIRST: {";","-","!","(",INT_LIT,FLOAT_LIT,BOOL_LIT,IDENT}
+# FOLLOW: {}
+# return_stmt_prime ::= ";" | expr ";"   
+# ======
+
+FIRST: {"-","!","(",INT_LIT,FLOAT_LIT,BOOL_LIT,IDENT}
+FOLLOW: {";",")",","}
+expr ::= IDENT "=" expr 
+        | rval_or
+
+FIRST: {"-","!","(",INT_LIT,FLOAT_LIT,BOOL_LIT,IDENT}
+FOLLOW: {";",")",","}
+rval_or ::= rval_and rval_or_prime 
+
+FIRST: {"||", epsilon}
+FOLLOW: {";",")",","}
+rval_or_prime ::= "||" rval_and rval_or_prime | epsilon
+
+FIRST: {"-","!","(",INT_LIT,FLOAT_LIT,BOOL_LIT,IDENT}
+FOLLOW: {"||",";",")",","}
+rval_and ::= rval_eq rval_and_prime 
+
+FIRST: {"&&", epsilon}
+FOLLOW: {"||",";",")",","}
+rval_and_prime ::= "&&" rval_eq rval_and_prime | epsilon
+
+FIRST: {"-","!","(",INT_LIT,FLOAT_LIT,BOOL_LIT,IDENT}
+FOLLOW: {"&&","||",";",")",","}
+rval_eq ::= rval_cmp rval_eq_prime 
+
+FIRST: {"==", "!=", epsilon}
+FOLLOW: {"&&","||",";",")",","}
+rval_eq_prime ::= "==" rval_cmp | "!=" rval_cmp | epsilon
+
+FIRST: {"-","!","(",INT_LIT,FLOAT_LIT,BOOL_LIT,IDENT}
+FOLLOW: {"==","!=","&&","||",";",")",","}
+rval_cmp ::= rval_add rval_cmp_prime 
+
+FIRST: {"<=", "<", ">=", ">", epsilon}
+FOLLOW: {"==","!=","&&","||",";",")",","}
+rval_cmp_prime ::= "<=" rval_add | "<" rval_add | ">=" rval_add | ">" rval_add | epsilon
+
+FIRST: {"-","!","(",INT_LIT,FLOAT_LIT,BOOL_LIT,IDENT}
+FOLLOW: {"<=","<",">=",">","==","!=","&&","||",";",")",","}
+rval_add ::= rval_mul rval_add_prime 
+
+FIRST: {"+","-",epsilon}
+FOLLOW: {"<=","<",">=",">","==","!=","&&","||",";",")",","}
+rval_add_prime ::= "+" rval_mul  | "-" rval_mul | epsilon
+
+FIRST: {"-", "!","(",INT_LIT,FLOAT_LIT,BOOL_LIT,IDENT}
+FOLLOW: {"+","-","<=","<",">=",">","==","!=","&&","||",";",")",","}
+rval_mul ::= rval_neg rval_mul_prime 
+
+FIRST: {"*", "/", "%", epsilon}
+FOLLOW: {"+","-","<=","<",">=",">","==","!=","&&","||",";",")",","}
+rval_mul_prime ::= "*" rval_neg  | "/" rval_neg  | "%" rval_neg | epsilon
+
+FIRST: {"-","!","(",INT_LIT,FLOAT_LIT,BOOL_LIT,IDENT}
+FOLLOW: {"*","/","%","+","-","<=","<",">=",">","==","!=","&&","||",";",")",","}
+rval_neg ::= "-" rval_neg | "!" rval_neg | rval_par 
+
+FIRST: {"(",INT_LIT,FLOAT_LIT,BOOL_LIT,IDENT}
+FOLLOW: {"*","/","%","+","-","<=","<",">=",">","==","!=","&&","||",";",")",","}
+rval_par ::= "(" expr ")" | rval_ident
+
+# ======
+# Without left factoring 
+FIRST: {INT_LIT,FLOAT_LIT,BOOL_LIT,IDENT}
+FOLLOW: {"*","/","%","+","-","<=","<",">=",">","==","!=","&&","||",";",")",","}
+rval_ident ::= IDENT | IDENT "(" args ")" | rval_term 
+
+# With left factoring 
+# FIRST: {INT_LIT,FLOAT_LIT,BOOL_LIT,IDENT}
+# FOLLOW: {}
+# rval_ident ::= IDENT rval_ident_prime | rval_term 
+
+# FIRST: {epsilon, "("}
+# FOLLOW: {}
+# rval_ident_prime ::= epsilon | "(" args ")" 
+# ======
+
+FIRST: {INT_LIT,FLOAT_LIT,BOOL_LIT}
+FOLLOW: {"*","/","%","+","-","<=","<",">=",">","==","!=","&&","||",";",")",","}
+rval_term ::= INT_LIT | FLOAT_LIT | BOOL_LIT
+
+FIRST: {"-", "!","(",INT_LIT,FLOAT_LIT,BOOL_LIT,IDENT}
+FOLLOW: {")"}
+args ::= arg_list 
+        |  epsilon
+
+FIRST: {"-","!","(",INT_LIT,FLOAT_LIT,BOOL_LIT,IDENT}
+FOLLOW: {")"}
+arg_list ::= expr arg_list_prime 
+
+FIRST: {",", epsilon}
+FOLLOW: {")"}
+arg_list_prime ::= "," expr arg_list_prime | epsilon 
