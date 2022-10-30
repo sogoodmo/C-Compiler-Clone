@@ -7,7 +7,7 @@ FIRST: {"extern", epsilon}
 FOLLOW: {"int","float","bool","void"}
 extern_list ::= extern extern_list_prime 
 
-
+        
 FIRST: {"extern", epsilon}
 FOLLOW: {"int","float","bool","void"}
 extern_list_prime ::= extern extern_list_prime 
@@ -28,20 +28,21 @@ decl_list_prime ::= decl decl_list_prime | epsilon
 # ========
 # Without left factoring 
 
-FIRST: {"int","float","bool","void"}
-FOLLOW: {"int","float","bool","void"}
-decl ::= var_decl | fun_decl 
+# FIRST: {"int","float","bool","void"}
+# FOLLOW: {"int","float","bool","void"}
+# decl ::= var_decl | fun_decl 
 
 
-# With left factoring 
-# FIRST: {"int","float","bool", "void"}
-# FOLLOW: {}
-# decl ::= var_type IDENT decl_prime | "void" IDENT "(" params ")" block
+With left factoring 
+FIRST: {"int","float","bool", "void"}
+FOLLOW: {}
+decl ::= var_type IDENT decl_prime | "void" IDENT "(" params ")" block
 
-# FIRST: {";", "("}
-# FOLLOW: {}
-# decl_prime ::= ";" | "(" params ")" block
+FIRST: {";", "("}
+FOLLOW: {'void' 'int' 'float' 'bool'}
+decl_prime ::= ";" | "(" params ")" block
 # =============
+
 FIRST: {"int","float","bool"}
 FOLLOW: {"int","float","bool","void"}
 var_decl ::= var_type IDENT ";" 
@@ -118,19 +119,19 @@ else_stmt  ::= "else" block | epsilon
 
 # ======
 # Without left factoring 
+# FIRST: {"return"}
+# FOLLOW: {";","{","if","while","return",IDENT,"-","!","(",INT_LIT,FLOAT_LIT,BOOL_LIT,"}"}
+# return_stmt ::= "return" ";" | "return" expr ";"
+
+With left factoring 
 FIRST: {"return"}
 FOLLOW: {";","{","if","while","return",IDENT,"-","!","(",INT_LIT,FLOAT_LIT,BOOL_LIT,"}"}
-return_stmt ::= "return" ";" | "return" expr ";"
+return_stmt ::= "return" return_stmt_prime 
 
-# With left factoring 
-# FIRST: {"return"}
-# FOLLOW: {}
-# return_stmt ::= "return" return_stmt_prime 
-
-# FIRST: {";","-","!","(",INT_LIT,FLOAT_LIT,BOOL_LIT,IDENT}
-# FOLLOW: {}
-# return_stmt_prime ::= ";" | expr ";"   
-# ======
+FIRST: {";","-","!","(",INT_LIT,FLOAT_LIT,BOOL_LIT,IDENT}
+FOLLOW: {";","{","if","while","return",IDENT,"-","!","(",INT_LIT,FLOAT_LIT,BOOL_LIT,"}"}
+return_stmt_prime ::= ";" | expr ";"   
+======
 
 FIRST: {"-","!","(",INT_LIT,FLOAT_LIT,BOOL_LIT,IDENT}
 FOLLOW: {";",")",","}
@@ -195,18 +196,18 @@ rval_par ::= "(" expr ")" | rval_ident
 
 # ======
 # Without left factoring 
-FIRST: {INT_LIT,FLOAT_LIT,BOOL_LIT,IDENT}
-FOLLOW: {"*","/","%","+","-","<=","<",">=",">","==","!=","&&","||",";",")",","}
-rval_ident ::= IDENT | IDENT "(" args ")" | rval_term 
+# FIRST: {INT_LIT,FLOAT_LIT,BOOL_LIT,IDENT}
+# FOLLOW: {"*","/","%","+","-","<=","<",">=",">","==","!=","&&","||",";",")",","}
+# rval_ident ::= IDENT | IDENT "(" args ")" | rval_term 
 
 # With left factoring 
-# FIRST: {INT_LIT,FLOAT_LIT,BOOL_LIT,IDENT}
-# FOLLOW: {}
-# rval_ident ::= IDENT rval_ident_prime | rval_term 
+FIRST: {INT_LIT,FLOAT_LIT,BOOL_LIT,IDENT}
+FOLLOW: {"*","/","%","+","-","<=","<",">=",">","==","!=","&&","||",";",")",","}
+rval_ident ::= IDENT rval_ident_prime | rval_term 
 
-# FIRST: {epsilon, "("}
-# FOLLOW: {}
-# rval_ident_prime ::= epsilon | "(" args ")" 
+FIRST: {epsilon, "("}
+FOLLOW: {"*","/","%","+","-","<=","<",">=",">","==","!=","&&","||",";",")",","}
+rval_ident_prime ::= epsilon | "(" args ")" 
 # ======
 
 FIRST: {INT_LIT,FLOAT_LIT,BOOL_LIT}
