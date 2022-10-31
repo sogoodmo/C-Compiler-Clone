@@ -1,18 +1,15 @@
 // MiniC program to test addition
-extern int print_int(int X);
+extern float print_int(float X);
 
-int addition(int n, int m){
-	int result;
+float addition(float n, float m){
+	float result;
+  float x;
 	result = n + m;
   
 
   if(n == 4) {
     print_int(n+m);
   }
-  else {
-    print_int(n*m);
-  }
 
   return result;
 }
-

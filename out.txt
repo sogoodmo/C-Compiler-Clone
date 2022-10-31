@@ -46,3 +46,150 @@ static void Rval_Term() {};
 static void Args() {};
 static void Arg_List() {};
 static void Arg_List_Prime() {};
+Production Rule: Extern
+Matched EXTERN: extern
+
+Production Rule: Var_Type
+Matched FLOAT_TOK: float
+
+Production Rule: Extern
+Matched IDENT: print_int
+
+Production Rule: Extern
+Matched LPAR: (
+
+Production Rule: Var_Type
+Matched FLOAT_TOK: float
+
+Production Rule: Param
+Matched IDENT: X
+
+Production Rule: Extern
+Matched RPAR: )
+
+Production Rule: Extern
+Matched SC: ;
+
+Production Rule: Var_Type
+Matched FLOAT_TOK: float
+
+Production Rule: Decl
+Matched IDENT: addition
+
+Production Rule: Decl_Prime
+Matched LPAR: (
+
+Production Rule: Var_Type
+Matched FLOAT_TOK: float
+
+Production Rule: Param
+Matched IDENT: n
+
+Production Rule: Param_List_Prime
+Matched COMMA: ,
+
+Production Rule: Var_Type
+Matched FLOAT_TOK: float
+
+Production Rule: Param
+Matched IDENT: m
+
+Production Rule: Decl_Prime
+Matched RPAR: )
+
+Production Rule: Block
+Matched LBRA: {
+
+Production Rule: Var_Type
+Matched FLOAT_TOK: float
+
+Production Rule: Local_Decl
+Matched IDENT: result
+
+Production Rule: Local_Decl
+Matched SC: ;
+
+Production Rule: Var_Type
+Matched FLOAT_TOK: float
+
+Production Rule: Local_Decl
+Matched IDENT: x
+
+Production Rule: Local_Decl
+Matched SC: ;
+
+Production Rule: Expr
+Matched IDENT: result
+
+Production Rule: Expr
+Matched ASSIGN: =
+
+Production Rule: Rval_Ident
+Matched IDENT: n
+
+Production Rule: Rval_Add_Prime
+Matched PLUS: +
+
+Production Rule: Rval_Ident
+Matched IDENT: m
+
+Production Rule: Expr_Stmt
+Matched SC: ;
+
+Production Rule: If_Stmt
+Matched IF: if
+
+Production Rule: If_Stmt
+Matched LPAR: (
+
+Production Rule: Rval_Ident
+Matched IDENT: n
+
+Production Rule: Rval_Eq_Prime
+Matched EQ: ==
+
+Production Rule: Rval_Term
+Matched INT_LIT: 4
+
+Production Rule: If_Stmt
+Matched RPAR: )
+
+Production Rule: Block
+Matched LBRA: {
+
+Production Rule: Rval_Ident
+Matched IDENT: print_int
+
+Production Rule: Rval_Ident_Prime
+Matched LPAR: (
+
+Production Rule: Rval_Ident
+Matched IDENT: n
+
+Production Rule: Rval_Add_Prime
+Matched PLUS: +
+
+Production Rule: Rval_Ident
+Matched IDENT: m
+
+Production Rule: Rval_Ident_Prime
+Matched RPAR: )
+
+Production Rule: Expr_Stmt
+Matched SC: ;
+
+Production Rule: Block
+Matched RBRA: }
+
+Production Rule: Return_Stmt
+Matched RETURN: return
+
+Production Rule: Rval_Ident
+Matched IDENT: result
+
+Production Rule: Return_Stmt_Prime
+Matched SC: ;
+
+Production Rule: Block
+Matched RBRA: }
+

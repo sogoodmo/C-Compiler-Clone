@@ -433,11 +433,11 @@ public:
         return Err.c_str();
     }
 };
-static void Match(TOKEN_TYPE expectedTokenType, string expectedTokenLexeme){
+static void Match(TOKEN_TYPE expectedTokenType, string expectedTokenLexeme, const char * prodRule = __builtin_FUNCTION()){
 	if (CurTok.type != expectedTokenType){
-		throw ParseException("Invalid Token Error: Expected: " + expectedTokenLexeme + "\nGot: " + CurTok.lexeme + " on line " + to_string(CurTok.lineNo));
+		throw ParseException("Invalid Token Error: Expected: " + expectedTokenLexeme + "");
 	}
-
+	cout << "Production Rule: " << prodRule << endl << "Matched " << expectedTokenLexeme << ": " << CurTok.lexeme << endl << endl; 
 	getNextToken();
 }
 // ----- Helper Functions End ------ // 
@@ -449,6 +449,7 @@ static void Var_Type();
 static void Type_Spec();
 
 static void Arg_List_Prime(){
+	// cout << "Arg_List_Prime" << endl;
 	switch (CurTok.type)
 	{
 		case COMMA:
@@ -459,11 +460,12 @@ static void Arg_List_Prime(){
 		case RPAR:
 			break;
 		default:
-			throw ParseException("Invalid Token Error: \nExpected: {COMMA, RPAR}\nGot: " + CurTok.lexeme + " on line " + to_string(CurTok.lineNo));
+			throw ParseException("Invalid Token Error: \nExpected: {COMMA, RPAR}");
 	}
 }
 
 static void Arg_List(){
+	// cout << "Arg_List" << endl;
 	switch (CurTok.type)
 	{
 		case BOOL_LIT:
@@ -477,11 +479,12 @@ static void Arg_List(){
 			Arg_List_Prime();
 			break;
 		default:
-			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS}\nGot: " + CurTok.lexeme + " on line " + to_string(CurTok.lineNo));
+			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS}");
 	}
 }
 
 static void Args(){
+	// cout << "Args" << endl;
 	switch (CurTok.type)
 	{
 		case BOOL_LIT:
@@ -492,15 +495,17 @@ static void Args(){
 		case NOT:
 		case MINUS:
 			Arg_List();
+			break;
 		case RPAR:
 			break;
 		default:
-			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS, RPAR}\nGot: " + CurTok.lexeme + " on line " + to_string(CurTok.lineNo));
+			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS, RPAR}");
 	}
 }
 
 
 static void Rval_Term(){
+	// cout << "Rval_Term" << endl;
 	switch (CurTok.type)
 	{
 		case BOOL_LIT:
@@ -513,10 +518,11 @@ static void Rval_Term(){
 			Match(INT_LIT, "INT_LIT");
 			break;
 		default:
-			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT}\nGot: " + CurTok.lexeme + " on line " + to_string(CurTok.lineNo));
+			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT}");
 	}
 }
 static void Rval_Ident_Prime(){
+	// cout << "Rval_Ident_Prime" << endl;
 	switch (CurTok.type)
 	{	
 		case COMMA:
@@ -542,10 +548,11 @@ static void Rval_Ident_Prime(){
 			Match(RPAR, "RPAR");
 			break;
 		default:
-			throw ParseException("Invalid Token Error: \nExpected: {COMMA, LPAR, RPAR, SC, OR, AND, EQ, NE, LT, GT, LE, GE, PLUS, MOD, DIV, ASTERIX}\nGot: " + CurTok.lexeme + " on line " + to_string(CurTok.lineNo));
+			throw ParseException("Invalid Token Error: \nExpected: {COMMA, LPAR, RPAR, SC, OR, AND, EQ, NE, LT, GT, LE, GE, PLUS, MOD, DIV, ASTERIX}");
 	}
 }
 static void Rval_Ident(){
+	// cout << "Rval_Ident" << endl;
 	switch (CurTok.type)
 	{
 		case BOOL_LIT:
@@ -556,12 +563,14 @@ static void Rval_Ident(){
 		case IDENT:
 			Match(IDENT, "IDENT");
 			Rval_Ident_Prime();
+			break;
 		default:
-			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, IDENT}\nGot: " + CurTok.lexeme + " on line " + to_string(CurTok.lineNo));
+			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, IDENT}");
 	}
 }
 
 static void Rval_Par(){
+	// cout << "Rval_Par" << endl;
 	switch (CurTok.type)
 	{
 		case BOOL_LIT:
@@ -574,12 +583,14 @@ static void Rval_Par(){
 			Match(LPAR, "LPAR");
 			Expr();
 			Match(RPAR, "RPAR");
+			break;
 		default:
-			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT}\nGot: " + CurTok.lexeme + " on line " + to_string(CurTok.lineNo));
+			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT}");
 	}
 }
 
 static void Rval_Neg(){
+	// cout << "Rval_Neg" << endl;
 	switch (CurTok.type)
 	{
 		case BOOL_LIT:
@@ -591,17 +602,18 @@ static void Rval_Neg(){
 			break;
 		case NOT:
 			Match(NOT, "NOT");
-			Rval_Par();
+			Rval_Neg();
 			break;
 		case MINUS:
 			Match(MINUS, "MINUS");
-			Rval_Par();
+			Rval_Neg();
 			break;
 		default:
-			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS}\nGot: " + CurTok.lexeme + " on line " + to_string(CurTok.lineNo));
+			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS}");
 	}
 }
 static void Rval_Mul_Prime(){
+	// cout << "Rval_Mul_Prime" << endl;
 	switch (CurTok.type)
 	{
 		case COMMA:
@@ -616,6 +628,7 @@ static void Rval_Mul_Prime(){
 		case LE:
 		case GE:
 		case PLUS:
+		case MINUS:
 			break;
 		case MOD:
 			Match(MOD, "MOD");
@@ -633,10 +646,11 @@ static void Rval_Mul_Prime(){
 			Rval_Mul_Prime();
 			break;
 		default:
-			throw ParseException("Invalid Token Error: \nExpected: {COMMA, RPAR, SC, OR, AND, EQ, NE, LT, GT, LE, GE, PLUS, MOD, DIV, ASTERIX}\nGot: " + CurTok.lexeme + " on line " + to_string(CurTok.lineNo));
+			throw ParseException("Invalid Token Error: \nExpected: {COMMA, RPAR, SC, OR, AND, EQ, NE, LT, GT, LE, GE, PLUS, MINUS, MOD, DIV, ASTERIX}");
 	}
 }
 static void Rval_Mul(){
+	// cout << "Rval_Mul" << endl;
 	switch (CurTok.type)
 	{
 		case BOOL_LIT:
@@ -650,10 +664,11 @@ static void Rval_Mul(){
 			Rval_Mul_Prime();
 			break;
 		default:
-			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS}\nGot: " + CurTok.lexeme + " on line " + to_string(CurTok.lineNo));
+			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS}");
 	}
 }
 static void Rval_Add_Prime(){
+	// cout << "Rval_Add_Prime" << endl;
 	switch (CurTok.type)
 	{
 		case COMMA:
@@ -673,11 +688,17 @@ static void Rval_Add_Prime(){
 			Rval_Mul();
 			Rval_Add_Prime();
 			break;
+		case MINUS:
+			Match(MINUS, "MINUS");
+			Rval_Mul();
+			Rval_Add_Prime();
+			break;
 		default:
-			throw ParseException("Invalid Token Error: \nExpected: {COMMA, RPAR, SC, OR, AND, EQ, NE, LT, GT, LE, GE, PLUS}\nGot: " + CurTok.lexeme + " on line " + to_string(CurTok.lineNo));
+			throw ParseException("Invalid Token Error: \nExpected: {COMMA, RPAR, SC, OR, AND, EQ, NE, LT, GT, LE, GE, PLUS, MINUS}");
 	}
 }
 static void Rval_Add(){
+	// cout << "Rval_Add" << endl;
 	switch (CurTok.type)
 	{
 		case BOOL_LIT:
@@ -691,10 +712,11 @@ static void Rval_Add(){
 			Rval_Add_Prime();
 			break;
 		default:
-			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS}\nGot: " + CurTok.lexeme + " on line " + to_string(CurTok.lineNo));
+			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS}");
 	}
 }
 static void Rval_Cmp_Prime(){
+	// cout << "Rval_Cmp_Prime" << endl;
 	switch (CurTok.type)
 	{
 		case COMMA:
@@ -716,7 +738,7 @@ static void Rval_Cmp_Prime(){
 			Rval_Cmp_Prime();
 			break;
 		case LE:
-			Match(GE, "GE");
+			Match(LE, "LE");
 			Rval_Add();
 			Rval_Cmp_Prime();
 			break;
@@ -726,10 +748,11 @@ static void Rval_Cmp_Prime(){
 			Rval_Cmp_Prime();
 			break;
 		default:
-			throw ParseException("Invalid Token Error: \nExpected: {COMMA, RPAR, SC, OR, AND, EQ, NE, LT, GT, LE, GE}\nGot: " + CurTok.lexeme + " on line " + to_string(CurTok.lineNo));
+			throw ParseException("Invalid Token Error: \nExpected: {COMMA, RPAR, SC, OR, AND, EQ, NE, LT, GT, LE, GE}");
 	}
 }
 static void Rval_Cmp(){
+	// cout << "Rval_Cmp" << endl;
 	switch (CurTok.type)
 	{
 		case BOOL_LIT:
@@ -743,10 +766,11 @@ static void Rval_Cmp(){
 			Rval_Cmp_Prime();
 			break;
 		default:
-			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS}\nGot: " + CurTok.lexeme + " on line " + to_string(CurTok.lineNo));
+			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS}");
 	}
 }
 static void Rval_Eq_Prime(){
+	// cout << "Rval_Eq_Prime" << endl;
 	switch (CurTok.type)
 	{
 		case COMMA:
@@ -758,7 +782,7 @@ static void Rval_Eq_Prime(){
 		case EQ:
 			Match(EQ, "EQ");
 			Rval_Cmp();
-			Rval_Cmp_Prime();
+			Rval_Eq_Prime();
 			break;
 		case NE:
 			Match(NE, "NE");
@@ -766,10 +790,11 @@ static void Rval_Eq_Prime(){
 			Rval_Eq_Prime();
 			break;
 		default:
-			throw ParseException("Invalid Token Error: \nExpected: {COMMA, RPAR, SC, OR, AND, EQ, NE}\nGot: " + CurTok.lexeme + " on line " + to_string(CurTok.lineNo));
+			throw ParseException("Invalid Token Error: \nExpected: {COMMA, RPAR, SC, OR, AND, EQ, NE}");
 	}
 }
 static void Rval_Eq(){
+	// cout << "Rval_Eq" << endl;
 	switch (CurTok.type)
 	{
 		case BOOL_LIT:
@@ -783,10 +808,11 @@ static void Rval_Eq(){
 			Rval_Eq_Prime();
 			break;
 		default:
-			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS}\nGot: " + CurTok.lexeme + " on line " + to_string(CurTok.lineNo));
+			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS}");
 	}
 }
 static void Rval_And_Prime(){
+	// cout << "Rval_And_Prime" << endl;
 	switch (CurTok.type)
 	{
 		case COMMA:
@@ -800,10 +826,11 @@ static void Rval_And_Prime(){
 			Rval_And_Prime();
 			break;
 		default:
-			throw ParseException("Invalid Token Error: \nExpected: {COMMA, RPAR, SC, OR, AND}\nGot: " + CurTok.lexeme + " on line " + to_string(CurTok.lineNo));
+			throw ParseException("Invalid Token Error: \nExpected: {COMMA, RPAR, SC, OR, AND}");
 	}
 }
 static void Rval_And(){
+	// cout << "Rval_And" << endl;
 	switch (CurTok.type)
 	{
 		case BOOL_LIT:
@@ -817,12 +844,13 @@ static void Rval_And(){
 			Rval_And_Prime();
 			break;
 		default:
-			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS}\nGot: " + CurTok.lexeme + " on line " + to_string(CurTok.lineNo));
+			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS}");
 	}
 }
 
 
 static void Rval_Or_Prime(){
+	// cout << "Rval_Or_Prime" << endl;
 	switch (CurTok.type)
 	{
 		case COMMA:
@@ -835,11 +863,12 @@ static void Rval_Or_Prime(){
 			Rval_Or_Prime();
 			break;
 		default:
-			throw ParseException("Invalid Token Error: \nExpected: {COMMA, RPAR, SC, OR}\nGot: " + CurTok.lexeme + " on line " + to_string(CurTok.lineNo));
+			throw ParseException("Invalid Token Error: \nExpected: {COMMA, RPAR, SC, OR}");
 	}
 }
 
 static void Rval_Or(){
+	// cout << "Rval_Or" << endl;
 	switch (CurTok.type)
 	{
 		case BOOL_LIT:
@@ -853,11 +882,12 @@ static void Rval_Or(){
 			Rval_Or_Prime();
 			break;
 		default:
-			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS}\nGot: " + CurTok.lexeme + " on line " + to_string(CurTok.lineNo));
+			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS}");
 	}
 }
 
 static void Expr(){
+	// cout << "Expr" << endl;
 	switch (CurTok.type)
 	{
 		case BOOL_LIT:
@@ -878,9 +908,9 @@ static void Expr(){
 
 			CurTok = tmpToken; 
 
-			if (nextToken.type == IDENT){
+			if (nextToken.type == ASSIGN){
 				Match(IDENT, "IDENT");
-				Match(EQ, "EQ");
+				Match(ASSIGN, "ASSIGN");
 				Expr();
 			} else{
 				Rval_Or();
@@ -892,11 +922,12 @@ static void Expr(){
 			Match(SC, "SC");
 			break;
 		default:
-			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS, SC}\nGot: " + CurTok.lexeme + " on line " + to_string(CurTok.lineNo));
+			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS, SC}");
 	}
 }
 
 static void Return_Stmt_Prime(){
+	// cout << "Return_Stmt_Prime" << endl;
 	switch (CurTok.type)
 	{
 		case BOOL_LIT:
@@ -913,11 +944,12 @@ static void Return_Stmt_Prime(){
 			Match(SC, "SC");
 			break;
 		default:
-			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS, SC}\nGot: " + CurTok.lexeme + " on line " + to_string(CurTok.lineNo));
+			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS, SC}");
 	}
 }
 
 static void Return_Stmt(){
+	// cout << "Return_Stmt" << endl;
 	switch (CurTok.type)
 	{
 		case RETURN:
@@ -925,11 +957,12 @@ static void Return_Stmt(){
 			Return_Stmt_Prime();
 			break;
 		default:
-			throw ParseException("Invalid Token Error: \nExpected: {RETURN}\nGot: " + CurTok.lexeme + " on line " + to_string(CurTok.lineNo));
+			throw ParseException("Invalid Token Error: \nExpected: {RETURN}");
 	}
 }
 
 static void Else_Stmt(){
+	// cout << "Else_Stmt" << endl;
 	switch (CurTok.type)
 	{
 		case BOOL_LIT:
@@ -951,11 +984,12 @@ static void Else_Stmt(){
 			Block();
 			break;
 		default:
-			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS, SC, RETURN, IF, WHILE, RBRA, LBRA, ELSE}\nGot: " + CurTok.lexeme + " on line " + to_string(CurTok.lineNo));
+			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS, SC, RETURN, IF, WHILE, RBRA, LBRA, ELSE}");
 	}
 }
 
 static void If_Stmt(){
+	// cout << "If_Stmt" << endl;
 	switch (CurTok.type)
 	{
 		case IF:
@@ -967,11 +1001,12 @@ static void If_Stmt(){
 			Else_Stmt();
 			break;
 		default:
-			throw ParseException("Invalid Token Error: \nExpected: {IF}\nGot: " + CurTok.lexeme + " on line " + to_string(CurTok.lineNo));
+			throw ParseException("Invalid Token Error: \nExpected: {IF}");
 	}
 }
 
 static void While_Stmt(){
+	// cout << "While_Stmt" << endl;
 	switch (CurTok.type)
 	{
 		case WHILE:
@@ -982,11 +1017,12 @@ static void While_Stmt(){
 			Stmt();
 			break;
 		default:
-			throw ParseException("Invalid Token Error: \nExpected: {WHILE}\nGot: " + CurTok.lexeme + " on line " + to_string(CurTok.lineNo));
+			throw ParseException("Invalid Token Error: \nExpected: {WHILE}");
 	}
 }
 
 static void Expr_Stmt(){
+	// cout << "Expr_Stmt" << endl;
 	switch (CurTok.type)
 	{
 		case BOOL_LIT:
@@ -998,14 +1034,17 @@ static void Expr_Stmt(){
 		case MINUS:
 			Expr();
 			Match(SC, "SC");
+			break;
 		case SC:
 			Match(SC, "SC");
+			break;
 		default:
-			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS, SC}\nGot: " + CurTok.lexeme + " on line " + to_string(CurTok.lineNo));
+			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS, SC}");
 	}
 }
 
 static void Stmt(){
+	// cout << "Stmt" << endl;
 	switch (CurTok.type)
 	{
 		case BOOL_LIT:
@@ -1017,20 +1056,26 @@ static void Stmt(){
 		case MINUS:
 		case SC:
 			Expr_Stmt();
+			break;
 		case RETURN:	
 			Return_Stmt();
+			break;
 		case IF:
 			If_Stmt();
+			break;
 		case WHILE:
 			While_Stmt();
+			break;
 		case LBRA:
 			Block();
+			break;
 		default:
-			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS, SC, RETURN, IF, WHILE, LBRA}\nGot: " + CurTok.lexeme + " on line " + to_string(CurTok.lineNo));
+			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS, SC, RETURN, IF, WHILE, LBRA}");
 	}
 }
 
 static void Stmt_List(){
+	// cout << "Stmt_List" << endl;
 	switch (CurTok.type)
 	{
 		case BOOL_LIT:
@@ -1047,14 +1092,16 @@ static void Stmt_List(){
 		case LBRA:
 			Stmt();
 			Stmt_List();
+			break;
 		case RBRA:
 			break;
 		default:
-			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS, SC, RETURN, IF, WHILE, RBRA, LBRA}\nGot: " + CurTok.lexeme + " on line " + to_string(CurTok.lineNo));
+			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS, SC, RETURN, IF, WHILE, RBRA, LBRA}");
 	}
 }
 
 static void Local_Decl(){
+	// cout << "Local_Decl" << endl;
 	switch (CurTok.type)
 	{
 		case BOOL_TOK:
@@ -1062,13 +1109,15 @@ static void Local_Decl(){
 		case INT_TOK:
 			Var_Type();
 			Match(IDENT, "IDENT");
+			Match(SC, "SC");
 			break;
 		default:
-			throw ParseException("Invalid Token Error: \nExpected: {BOOL_TOK, FLOAT_TOK, INT_TOK}\nGot: " + CurTok.lexeme + " on line " + to_string(CurTok.lineNo));
+			throw ParseException("Invalid Token Error: \nExpected: {BOOL_TOK, FLOAT_TOK, INT_TOK}");
 	}
 }
 
 static void Local_Decls(){
+	// cout << "Local_Decls" << endl;
 	switch (CurTok.type)
 	{
 		case BOOL_LIT:
@@ -1092,11 +1141,12 @@ static void Local_Decls(){
 			Local_Decls();
 			break;
 		default:
-			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS, SC, RETURN, IF, WHILE, RBRA, LBRA, BOOL_TOK, FLOAT_TOK, INT_TOK}\nGot: " + CurTok.lexeme + " on line " + to_string(CurTok.lineNo));
+			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS, SC, RETURN, IF, WHILE, RBRA, LBRA, BOOL_TOK, FLOAT_TOK, INT_TOK}");
 	}
 }
 
 static void Block(){
+	// cout << "Block" << endl;
 	switch (CurTok.type)
 	{
 		case LBRA:
@@ -1106,11 +1156,12 @@ static void Block(){
 			Match(RBRA, "RBRA");
 			break;
 		default:
-			throw ParseException("Invalid Token Error: \nExpected: {LBRA}\nGot: " + CurTok.lexeme + " on line " + to_string(CurTok.lineNo));
+			throw ParseException("Invalid Token Error: \nExpected: {LBRA}");
 	}
 }
 
 static void Param(){
+	// cout << "Param" << endl;
 	switch (CurTok.type)
 	{
 		case BOOL_TOK:
@@ -1120,11 +1171,12 @@ static void Param(){
 			Match(IDENT, "IDENT");
 			break;
 		default:
-			throw ParseException("Invalid Token Error: \nExpected: {BOOL_TOK, FLOAT_TOK, INT_TOK}\nGot: " + CurTok.lexeme + " on line " + to_string(CurTok.lineNo));
+			throw ParseException("Invalid Token Error: \nExpected: {BOOL_TOK, FLOAT_TOK, INT_TOK}");
 	}
 }
 
 static void Param_List_Prime(){
+	// cout << "Param_List_Prime" << endl;
 	switch (CurTok.type)
 	{
 		case COMMA:
@@ -1135,11 +1187,12 @@ static void Param_List_Prime(){
 		case RPAR:
 			break;
 		default:
-			throw ParseException("Invalid Token Error: \nExpected: {COMMA, RPAR}\nGot: " + CurTok.lexeme + " on line " + to_string(CurTok.lineNo));
+			throw ParseException("Invalid Token Error: \nExpected: {COMMA, RPAR}");
 	}
 }
 
 static void Param_List(){
+	// cout << "Param_List" << endl;
 	switch (CurTok.type)
 	{
 		case BOOL_TOK:
@@ -1149,11 +1202,12 @@ static void Param_List(){
 			Param_List_Prime();
 			break;
 		default:
-			throw ParseException("Invalid Token Error: \nExpected: {BOOL_TOK, FLOAT_TOK, INT_TOK}\nGot: " + CurTok.lexeme + " on line " + to_string(CurTok.lineNo));
+			throw ParseException("Invalid Token Error: \nExpected: {BOOL_TOK, FLOAT_TOK, INT_TOK}");
 	}
 }
 
 static void Params(){
+	// cout << "Params" << endl;
 	switch (CurTok.type)
 	{
 		case RPAR:
@@ -1167,12 +1221,13 @@ static void Params(){
 			Param_List();
 			break;
 		default:
-			throw ParseException("Invalid Token Error: \nExpected: {RPAR, VOID_TOK, BOOL_TOK, FLOAT_TOK, INT_TOK}\nGot: " + CurTok.lexeme + " on line " + to_string(CurTok.lineNo));
+			throw ParseException("Invalid Token Error: \nExpected: {RPAR, VOID_TOK, BOOL_TOK, FLOAT_TOK, INT_TOK}");
 	}
 }
 
 
 static void Func_Decl(){
+	// cout << "Func_Decl" << endl;
 	switch (CurTok.type)
 	{
 		case VOID_TOK:
@@ -1187,11 +1242,12 @@ static void Func_Decl(){
 			Block();
 			break;
 		default:
-			throw ParseException("Invalid Token Error: \nExpected: {VOID_TOK, BOOL_TOK, FLOAT_TOK, INT_TOK}\nGot: " + CurTok.lexeme + " on line " + to_string(CurTok.lineNo));
+			throw ParseException("Invalid Token Error: \nExpected: {VOID_TOK, BOOL_TOK, FLOAT_TOK, INT_TOK}");
 	}
 }
 
 static void Var_Type(){
+	// cout << "Var_Type" << endl;
 	switch (CurTok.type)
 	{
 		case BOOL_TOK:
@@ -1204,11 +1260,12 @@ static void Var_Type(){
 			Match(INT_TOK, "INT_TOK");
 			break;
 		default:
-			throw ParseException("Invalid Token Error: \nExpected: {BOOL_TOK, FLOAT_TOK, INT_TOK}\nGot: " + CurTok.lexeme + " on line " + to_string(CurTok.lineNo));
+			throw ParseException("Invalid Token Error: \nExpected: {BOOL_TOK, FLOAT_TOK, INT_TOK}");
 	}
 }
 
 static void Type_Spec(){
+	// cout << "Type_Spec" << endl;
 	switch (CurTok.type)
 	{
 		case VOID_TOK:
@@ -1220,11 +1277,12 @@ static void Type_Spec(){
 			Var_Type();
 			break;
 		default:
-			throw ParseException("Invalid Token Error: \nExpected: {VOID_TOK, BOOL_TOK, FLOAT_TOK, INT_TOK}\nGot: " + CurTok.lexeme + " on line " + to_string(CurTok.lineNo));
+			throw ParseException("Invalid Token Error: \nExpected: {VOID_TOK, BOOL_TOK, FLOAT_TOK, INT_TOK}");
 	} 
 }
 
 static void Var_Decl(){
+	// cout << "Var_Decl" << endl;
 	switch (CurTok.type)
 	{
 		case BOOL_TOK:
@@ -1235,11 +1293,12 @@ static void Var_Decl(){
 			Match(SC, "SC");
 			break;
 		default:
-			throw ParseException("Invalid Token Error: \nExpected: {BOOL_TOK, FLOAT_TOK, INT_TOK}\nGot: " + CurTok.lexeme + " on line " + to_string(CurTok.lineNo));
+			throw ParseException("Invalid Token Error: \nExpected: {BOOL_TOK, FLOAT_TOK, INT_TOK}");
 	} 
 }
 
 static void Decl_Prime(){
+	// cout << "Decl_Prime" << endl;
 	switch (CurTok.type)
 	{
 		case LPAR:
@@ -1252,62 +1311,71 @@ static void Decl_Prime(){
 			Match(SC, "SC");
 			break;
 		default:
-			throw ParseException("Invalid Token Error: \nExpected: {LPAR, SC}\nGot: " + CurTok.lexeme + " on line " + to_string(CurTok.lineNo));
+			throw ParseException("Invalid Token Error: \nExpected: {LPAR, SC}");
 	} 
 }
 
 static void Decl() {
+	// cout << "Decl" << endl;
 	switch (CurTok.type)
 	{
-	case VOID_TOK:
-		Match(VOID_TOK, "VOID_TOK");
-		Match(IDENT, "IDENT");
-		Match(LPAR, "LPAR");
-		Params();
-		Match(RPAR, "RPAR");
-		Block();
-		break;
-	case BOOL_TOK:
-	case FLOAT_TOK:
-	case INT_TOK:
-		Var_Type();
-		Match(IDENT, "IDENT");
-		Decl_Prime();
-		break;
-	default:
-		throw ParseException("Invalid Token Error: \nExpected: {VOID_TOK, BOOL_TOK, FLOAT_TOK, INT_TOK, EXTERN}\nGot: " + CurTok.lexeme + " on line " + to_string(CurTok.lineNo));
+		case VOID_TOK:
+			Match(VOID_TOK, "VOID_TOK");
+			Match(IDENT, "IDENT");
+			Match(LPAR, "LPAR");
+			Params();
+			Match(RPAR, "RPAR");
+			Block();
+			break;
+		case BOOL_TOK:
+		case FLOAT_TOK:
+		case INT_TOK:
+			Var_Type();
+			Match(IDENT, "IDENT");
+			Decl_Prime();
+			break;
+		default:
+			throw ParseException("Invalid Token Error: \nExpected: {VOID_TOK, BOOL_TOK, FLOAT_TOK, INT_TOK, EXTERN}");
 	}
 };
 
 static void Decl_List_Prime(){
+	// cout << "Decl_List_Prime" << endl;
 	switch (CurTok.type)
 	{
-	case VOID_TOK:
-	case BOOL_TOK:
-	case FLOAT_TOK:
-	case INT_TOK:
-		Decl();
-		Decl_List_Prime();
-		break;
+		case VOID_TOK:
+		case BOOL_TOK:
+		case FLOAT_TOK:
+		case INT_TOK:
+			Decl();
+			Decl_List_Prime();
+			break;
+		case EOF_TOK:
+			break;
+		default:
+			throw ParseException("Invalid Token Error: \nExpected: {VOID_TOK, BOOL_TOK, FLOAT_TOK, INT_TOK, EOF}");
 	}
 }
 
 static void Decl_List() {
+	// cout << "Decl_List" << endl;
 	switch (CurTok.type)
 	{
-	case VOID_TOK:
-	case BOOL_TOK:
-	case FLOAT_TOK:
-	case INT_TOK:
-		Decl_List_Prime();
-		break;
-	default:
-		throw ParseException("Invalid Token Error: \nExpected: {VOID_TOK, BOOL_TOK, FLOAT_TOK, INT_TOK, EXTERN}\nGot: " + CurTok.lexeme + " on line " + to_string(CurTok.lineNo));
+		case VOID_TOK:
+		case BOOL_TOK:
+		case FLOAT_TOK:
+		case INT_TOK:
+			Decl();
+			Decl_List_Prime();
+			break;
+		default:
+			throw ParseException("Invalid Token Error: \nExpected: {VOID_TOK, BOOL_TOK, FLOAT_TOK, INT_TOK}");
 	}
 };
 
 
 static void Extern(){
+	// cout << "Extern" << endl;
 	switch (CurTok.type)
 	{
 		case EXTERN:
@@ -1320,28 +1388,30 @@ static void Extern(){
 			Match(SC, "SC");
 			break;
 		default:
-			throw ParseException("Invalid Token Error: \nExpected: {EXTERN}\nGot: " + CurTok.lexeme + " on line " + to_string(CurTok.lineNo));
+			throw ParseException("Invalid Token Error: \nExpected: {EXTERN}");
 	}
 }
 
 static void Extern_List_Prime(){
+	// cout << "Extern_List_Prime" << endl;
 	switch (CurTok.type)
 	{
-	case EXTERN:
-		Extern();
-		Extern_List_Prime();
-		break;
-	case VOID_TOK:
-	case BOOL_TOK:
-	case FLOAT_TOK:
-	case INT_TOK:
-		return; 
-	default:
-		throw ParseException("Invalid Token Error: \nExpected: {VOID_TOK, BOOL_TOK, FLOAT_TOK, INT_TOK, EXTERN}\nGot: " + CurTok.lexeme + " on line " + to_string(CurTok.lineNo));
+		case EXTERN:
+			Extern();
+			Extern_List_Prime();
+			break;
+		case VOID_TOK:
+		case BOOL_TOK:
+		case FLOAT_TOK:
+		case INT_TOK:
+			return; 
+		default:
+			throw ParseException("Invalid Token Error: \nExpected: {VOID_TOK, BOOL_TOK, FLOAT_TOK, INT_TOK, EXTERN}");
 	}
 }
 
 static void Extern_List() {
+	// cout << "Extern_List" << endl;
 	switch (CurTok.type)
 	{
 		case EXTERN:
@@ -1349,27 +1419,28 @@ static void Extern_List() {
 			Extern_List_Prime();
 			break;
 		default:
-			throw ParseException("Invalid Token Error: \nExpected {EXTERN}\nGot: "+CurTok.lexeme);
+			throw ParseException("Invalid Token Error: \nExpected {EXTERN}");
 	}
 
 };
 
 // program ::= extern_list decl_list | decl_list
 static void Program(){
-    switch (CurTok.type)
+    // cout << "Program" << endl;
+	switch (CurTok.type)
     {
-    case VOID_TOK:
-    case BOOL_TOK:
-    case FLOAT_TOK:
-    case INT_TOK:
-        Decl_List();
-        break;
-    case EXTERN:
-        Extern_List();
-        Decl_List();
-        break;
-    default:
-        throw ParseException("Invalid Token Error: \nExpected: {VOID_TOK, BOOL_TOK, FLOAT_TOK, INT_TOK, EXTERN}\nGot: " + CurTok.lexeme + " on line " + to_string(CurTok.lineNo));
+		case VOID_TOK:
+		case BOOL_TOK:
+		case FLOAT_TOK:
+		case INT_TOK:
+			Decl_List();
+			break;
+		case EXTERN:
+			Extern_List();
+			Decl_List();
+			break;
+		default:
+			throw ParseException("Invalid Token Error: \nExpected: {VOID_TOK, BOOL_TOK, FLOAT_TOK, INT_TOK, EXTERN}");
     }
 } 	
 
@@ -1378,10 +1449,11 @@ static void parser(){
 
 	try {
 		Program();
+		if (CurTok.type != EOF_TOK){
+			throw ParseException("Invalid Token Error: \nExpected: {EOF}");
+		}
 	} catch(const exception& e){
-		cout << CurTok.type << endl;
-
-		cout << e.what() << endl;
+		cout << e.what() << endl << "Got: " << CurTok.lexeme << " (Type: " << CurTok.type << ") on-line: " << CurTok.lineNo << endl;
 	}
 }
 
