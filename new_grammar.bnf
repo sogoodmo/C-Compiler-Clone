@@ -10,8 +10,7 @@ extern_list ::= extern extern_list_prime
         
 FIRST: {"extern", epsilon}
 FOLLOW: {"int","float","bool","void"}
-extern_list_prime ::= extern extern_list_prime 
-            | epsilon
+extern_list_prime ::= extern extern_list_prime | epsilon
 
 FIRST: {"extern"}
 FOLLOW: {"int","float","bool","void", "extern"}

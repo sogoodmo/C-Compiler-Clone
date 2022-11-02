@@ -394,25 +394,108 @@ class ASTnode {
 public:
 	virtual ~ASTnode() {}
 	virtual Value *codegen() = 0;
-	virtual std::string to_string() const {};
+	virtual string to_string() const {};
 };
 
-/// IntASTnode - Class for integer literals like 1, 2, 10,
-class IntASTnode : public ASTnode {
-	int Val;
-	TOKEN Tok;
-	std::string Name;
+/// NumberAST - Class for numeric literals like 1, 2, 10,
+class NumberAST : public ASTnode {
+	double Val;
 
 public:
-	IntASTnode(TOKEN tok, int val) : Val(val), Tok(tok) {}
-	virtual Value *codegen() override;
+	NumberAST(double val) 
+		: Val(val){}
+	
+	// virtual Value *codegen() override {
+	// 	cout << "code gen" << endl;
+	// };
 
-
-	virtual std::string to_string() const override {
-		return Name;
+	virtual string to_string() const override {
+		return Val;
 	};
 };
 
+
+/// VariableAST - Class for variable names 
+class VariableAST : public ASTnode {
+	string Name;
+
+public:
+	VariableAST(string name) 
+		: Name(name){}
+
+	virtual string to_string() const override {
+		return Name;
+	};
+}
+
+/// BinaryExpAST - Class for variable names 
+class BinaryExprAST : public ASTnode {
+	char Op;
+	unique_ptr<ASTnode> LHS, RHS; 
+
+
+public:
+	BinaryExpAST(char op, unique_ptr<ASTnode> LHS, unique_ptr<ASTnode> RHS) 
+		: Op(op), LHS(move(LHS)), RHS(move(RHS)) {}
+
+	virtual string to_string() const override {
+		return LHS.to_string() + Op + RHS.to_string();
+	};
+}
+
+/// UnaryExpAST - Class for variable names 
+class UnaryExprAST : public ASTnode {
+	char Op;
+	unique_ptr<ASTnode> Expr; 
+
+
+public:
+	UnaryExpAST(char op, unique_ptr<ASTnode> Expr) 
+		: Op(op), Expr(move(Expr)) {}
+
+	virtual string to_string() const override {
+		return Op + Expr.to_string();
+	};
+}
+
+
+class FuncCallAST : public ASTnode { 
+	string FuncName;
+	vector<unique_ptr<ASTnode>> FuncArgs; 
+
+public:
+	FuncCallAST(string FuncName, vector<unique_ptr<ASTnode>> FuncArgs )
+		: FuncName(FuncName), FuncArgs(move(FuncArgs)) {}
+	
+	virtual string to_string() const override {
+		string args = "";
+
+		for (int i=0; i<FuncArgs.size()-1; i++){
+			args = args + arg[i].to_string() + ", "
+		}
+
+		return FuncName + "(" + args + arg[FuncArgs.size() - 1] + ")"
+	}
+}
+
+
+
+class FuncParamAST : public ASTnode {
+	string Name;
+	string Type;
+
+	
+}
+
+class FuncSignatureAST : public ASTnode {
+	string FuncName;
+	string FuncType; 
+	vector<string> FuncArgs; 
+	
+public 
+	FuncSignatureAST(string FuncName, string FuncType, vector<string> FuncArgs) 
+		: FuncName(FuncName), FuncType(FuncType), FuncArgs(move(FuncArgs)) {}
+}
 
 
 /* add other AST nodes as nessasary */
@@ -1392,6 +1475,7 @@ static void Extern(){
 	}
 }
 
+// extern_list_prime ::= extern extern_list_prime | epsilon
 static void Extern_List_Prime(){
 	// cout << "Extern_List_Prime" << endl;
 	switch (CurTok.type)
@@ -1410,6 +1494,8 @@ static void Extern_List_Prime(){
 	}
 }
 
+
+// extern_list ::= extern extern_list_prime 
 static void Extern_List() {
 	// cout << "Extern_List" << endl;
 	switch (CurTok.type)
