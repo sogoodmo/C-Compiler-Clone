@@ -389,6 +389,9 @@ static void putBackToken(TOKEN tok) { tok_buffer.push_front(tok); }
 // AST nodes
 //===----------------------------------------------------------------------===//
 
+
+
+
 /// ASTnode - Base class for all AST nodes.
 class ASTnode {
 public:
@@ -397,105 +400,258 @@ public:
 	virtual string to_string() const {};
 };
 
-/// NumberAST - Class for numeric literals like 1, 2, 10,
-class NumberAST : public ASTnode {
-	double Val;
+// Turning a vector of arguments into a nice string 
+// string format_args(vector<unique_ptr<ASTnode>> args){
+// 	string arg_str="";
+
+// 	for (int i = 0; i < args.size() - 1; i++){
+// 		arg_str.append(args[i]->to_string());
+// 		arg_str.append(", ");
+// 	}
+// 	return "(" + arg_str + args[args.size() - 1]->to_string() + ")";
+// }
+
+/// IntegerAST - Class for numeric literals like 1, 2, 10, 10
+// class IntegerAST : public ASTnode {
+// 	double Val;
+
+// public:
+// 	IntegerAST(int val) 
+// 		: Val(val){}
+
+// 	virtual string to_string() const override {
+// 		return std::to_string(Val);
+// 	};
+// };
+// /// FloatAST - Class for float literals like 1.3 2.1
+// class FloatAST : public ASTnode {
+// 	float Val;
+
+// public:
+// 	NumberAST(float val) 
+// 		: Val(val){}
+
+// 	virtual string to_string() const override {
+// 		return std::to_string(Val);
+// 	};
+// };
+// /// Bool - Class for boo literals like True, False
+// class BoolAST : public ASTnode {
+// 	bool Val;
+
+// public:
+// 	NumberAST(double val) 
+// 		: Val(val){}
+
+// 	virtual string to_string() const override {
+// 		return std::to_string(Val);
+// 	};
+// };
+// /// VariableAST - Class for variable names 
+// class VariableAST : public ASTnode {
+// 	string Name;
+// 	string Type; 
+
+// public:
+// 	VariableAST(string name, string type) 
+// 		: Name(name), Type(type) {}
+
+// 	virtual string to_string() const override {
+// 		return Type + " " + Name;
+// 	};
+// };
+// /// BinaryExpAST - Class for variable names 
+// class BinaryExprAST : public ASTnode {
+// 	char Op;
+// 	unique_ptr<ASTnode> LHS, RHS; 
+
+// public:
+// 	BinaryExprAST(char op, unique_ptr<ASTnode> LHS, unique_ptr<ASTnode> RHS) 
+// 		: Op(op), LHS(std::move(LHS)), RHS(std::move(RHS)) {}
+
+// 	virtual string to_string() const override {
+// 		return LHS->to_string() + Op + RHS->to_string();
+// 	};
+// };
+// /// UnaryExpAST - Class for variable names 
+// class UnaryExprAST : public ASTnode {
+// 	char Op;
+// 	unique_ptr<ASTnode> Expr; 
+
+
+// public:
+// 	UnaryExprAST(char op, unique_ptr<ASTnode> Expr) 
+// 		: Op(op), Expr(std::move(Expr)) {}
+
+// 	virtual string to_string() const override {
+// 		return Op + Expr->to_string();
+// 	};
+// };
+
+
+// /// FuncCallAST - Class for function calls 
+// class FuncCallAST : public ASTnode { 
+// 	string FuncName;
+// 	vector<unique_ptr<ASTnode>> FuncArgs; 
+
+// public:
+// 	FuncCallAST(string FuncName, vector<unique_ptr<ASTnode>> FuncArgs)
+// 		: FuncName(FuncName), FuncArgs(std::move(FuncArgs)) {}
+	
+// 	virtual string to_string() const override {
+// 		return FuncName + format_args(FuncArgs);
+// 	};
+// };
+
+
+// class Param : public ASTnode{
+// 	string Name;
+// 	string Type;
+	
+// public:
+// 	Param(string Name, string Type)
+// 		: Name(Name), Type(Type) {}
+	
+// 	virtual string to_string() const override{
+// 		return Type + " " + Name;
+// 	};
+// };
+
+// // FuncSignatureAST - Class for the a function signature
+// class FuncSignatureAST : public ASTnode {
+// 	string FuncName;
+// 	string FuncType; 
+// 	vector<FuncParamAST> FuncArgs; 
+	
+// public:
+// 	FuncSignatureAST(string FuncName, string FuncType, vector<FuncParamAST> FuncArgs) 
+// 		: FuncName(FuncName), FuncType(FuncType), FuncArgs(std::move(FuncArgs)) {}
+
+// 	virtual string to_string() const override{
+// 		return FuncType + " " + FuncName + format_args(FuncArgs);
+// 	};
+// };
+
+
+
+enum VAR_TYPE {
+	VOID_TYPE = 0,
+	INT_TYPE,
+	FLOAT_TYPE,
+	BOOL_TYPE
+};
+const std::string VarStr(VAR_TYPE type)
+{
+    switch (type)
+    {
+        case VOID_TYPE: return "void";
+        case INT_TYPE: return "int";
+        case FLOAT_TYPE: return "float";
+        case BOOL_TYPE: return "bool";
+    }
+}
+
+class DeclAST;
+
+class ExprAST : public ASTnode{
+	int x;
+};
+class IfAST : public ASTnode{
+	int x;
+};
+class WhileAST : public ASTnode{
+	int x;
+};
+class ReturnAST : public ASTnode{
+	int x;
+};
+
+class StmtAST : public ASTnode{
+	TOKEN Tok; 
+	std::unique_ptr<ExprAST> Expr;
+	std::unique_ptr<IfAST> If;
+	std::unique_ptr<WhileAST> While;
+	std::unique_ptr<ReturnAST> Return;
 
 public:
-	NumberAST(double val) 
-		: Val(val){}
+	StmtAST(TOKEN Tok, std::unique_ptr<ExprAST> Expr, std::unique_ptr<IfAST> If, std::unique_ptr<WhileAST> While, std::unique_ptr<ReturnAST> Return)
+		: Tok(std::move(Tok)), Expr(std::move(Expr)), If(std::move(If)), While(std::move(While)), Return(std::move(Return)) {}
 	
-	// virtual Value *codegen() override {
-	// 	cout << "code gen" << endl;
-	// };
-
-	virtual string to_string() const override {
-		return Val;
+	virtual string to_string() const override{
+		return "fk";
 	};
 };
 
-
-/// VariableAST - Class for variable names 
-class VariableAST : public ASTnode {
-	string Name;
-
-public:
-	VariableAST(string name) 
-		: Name(name){}
-
-	virtual string to_string() const override {
-		return Name;
-	};
-}
-
-/// BinaryExpAST - Class for variable names 
-class BinaryExprAST : public ASTnode {
-	char Op;
-	unique_ptr<ASTnode> LHS, RHS; 
-
+class BlockAST : public ASTnode{
+	TOKEN Tok;
+	std::vector<std::unique_ptr<DeclAST>> Block_Decl_List; 
+	std::vector<std::unique_ptr<StmtAST>> Block_Stmt_List;
 
 public:
-	BinaryExpAST(char op, unique_ptr<ASTnode> LHS, unique_ptr<ASTnode> RHS) 
-		: Op(op), LHS(move(LHS)), RHS(move(RHS)) {}
-
-	virtual string to_string() const override {
-		return LHS.to_string() + Op + RHS.to_string();
-	};
-}
-
-/// UnaryExpAST - Class for variable names 
-class UnaryExprAST : public ASTnode {
-	char Op;
-	unique_ptr<ASTnode> Expr; 
-
-
-public:
-	UnaryExpAST(char op, unique_ptr<ASTnode> Expr) 
-		: Op(op), Expr(move(Expr)) {}
-
-	virtual string to_string() const override {
-		return Op + Expr.to_string();
-	};
-}
-
-
-class FuncCallAST : public ASTnode { 
-	string FuncName;
-	vector<unique_ptr<ASTnode>> FuncArgs; 
-
-public:
-	FuncCallAST(string FuncName, vector<unique_ptr<ASTnode>> FuncArgs )
-		: FuncName(FuncName), FuncArgs(move(FuncArgs)) {}
+	BlockAST(std::vector<std::unique_ptr<DeclAST>> Block_Decl_List, std::vector<std::unique_ptr<StmtAST>> Block_Stmt_List, TOKEN Tok)
+		: Block_Decl_List(std::move(Block_Decl_List)), Block_Stmt_List(std::move(Block_Stmt_List)), Tok(std::move(Tok)) {}
 	
-	virtual string to_string() const override {
-		string args = "";
+	virtual string to_string() const override{
+		return "fl";
+	};
+};
 
-		for (int i=0; i<FuncArgs.size()-1; i++){
-			args = args + arg[i].to_string() + ", "
-		}
+class ParamAST : public ASTnode {
+	TOKEN Tok;
+	VAR_TYPE Type;
+	std::string Ident;
 
-		return FuncName + "(" + args + arg[FuncArgs.size() - 1] + ")"
-	}
-}
-
-
-
-class FuncParamAST : public ASTnode {
-	string Name;
-	string Type;
-
+public:
+	ParamAST(VAR_TYPE Type, const std::string &Ident, TOKEN Tok)
+		: Type(Type), Ident(Ident), Tok(std::move(Tok)) {}
 	
-}
+	virtual string to_string() const override{
+		return VarStr(Type) + " " + Ident;
+	};
+};
 
-class FuncSignatureAST : public ASTnode {
-	string FuncName;
-	string FuncType; 
-	vector<string> FuncArgs; 
+class ExternAST : public ASTnode {
+	TOKEN Tok; 
+	VAR_TYPE Type;
+	std::string Ident; 
+	std::vector<std::unique_ptr<ParamAST>> Params_List;
+
+public:
+	ExternAST(VAR_TYPE Type, const std::string &Ident, std::vector<std::unique_ptr<ParamAST>> Params_List, TOKEN Tok)
+		: Type(Type), Ident(Ident), Params_List(std::move(Params_List)), Tok(std::move(Tok)) {}
 	
-public 
-	FuncSignatureAST(string FuncName, string FuncType, vector<string> FuncArgs) 
-		: FuncName(FuncName), FuncType(FuncType), FuncArgs(move(FuncArgs)) {}
-}
+	virtual std::string to_string() const override{
+		return "shit";
+	};
+};
+
+class DeclAST : public ASTnode{
+	TOKEN Tok;
+	VAR_TYPE Type;
+	std::vector<std::unique_ptr<ParamAST>> Params_List;
+	std::unique_ptr<BlockAST> Block; 
+
+public:
+	DeclAST(std::vector<std::unique_ptr<ParamAST>> Params_List, std::unique_ptr<BlockAST> Block, VAR_TYPE Type, TOKEN Tok)
+		: Params_List(std::move(Params_List)), Block(std::move(Block)), Tok(std::move(Tok)), Type(Type) {}
+	virtual std::string to_string() const override{
+		return "";
+	};
+};
+
+class ProgramAST : public ASTnode {
+	TOKEN Tok; 
+	std::vector<std::unique_ptr<ExternAST>> Extern_List; 
+	std::vector<std::unique_ptr<DeclAST>> Decl_List;
+
+public:
+	ProgramAST(std::vector<std::unique_ptr<ExternAST>> Extern_List, std::vector<std::unique_ptr<DeclAST>> Decl_List, TOKEN Tok)
+		: Extern_List(std::move(Extern_List)), Decl_List(std::move(Decl_List)), Tok(std::move(Tok)) {}
+
+	virtual std::string to_string() const override{
+		return "fk"; 
+	};
+};
 
 
 /* add other AST nodes as nessasary */

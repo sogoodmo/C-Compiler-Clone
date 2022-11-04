@@ -59,6 +59,16 @@
         "__tuple": "cpp",
         "__verbose_abort": "cpp",
         "ios": "cpp",
-        "locale": "cpp"
+        "locale": "cpp",
+        "array": "cpp",
+        "cmath": "cpp",
+        "deque": "cpp",
+        "list": "cpp",
+        "map": "cpp",
+        "set": "cpp",
+        "unordered_map": "cpp",
+        "numeric": "cpp",
+        "optional": "cpp",
+        "ranges": "cpp"
     }
 }
