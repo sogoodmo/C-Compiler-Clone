@@ -7,7 +7,6 @@ FIRST: {"extern", epsilon}
 FOLLOW: {"int","float","bool","void"}
 extern_list ::= extern extern_list_prime 
 
-        
 FIRST: {"extern", epsilon}
 FOLLOW: {"int","float","bool","void"}
 extern_list_prime ::= extern extern_list_prime | epsilon
@@ -31,6 +30,13 @@ decl_list_prime ::= decl decl_list_prime | epsilon
 # FOLLOW: {"int","float","bool","void"}
 # decl ::= var_decl | fun_decl 
 
+# FIRST: {"int","float","bool"}
+# FOLLOW: {"int","float","bool","void"}
+# var_decl ::= var_type IDENT ";" 
+
+# FIRST: {"void","int","float","bool"}
+# FOLLOW: {"int","float","bool","void"}
+# fun_decl ::= type_spec IDENT "(" params ")" block
 
 With left factoring 
 FIRST: {"int","float","bool", "void"}
@@ -42,9 +48,6 @@ FOLLOW: {'void' 'int' 'float' 'bool'}
 decl_prime ::= ";" | "(" params ")" block
 # =============
 
-FIRST: {"int","float","bool"}
-FOLLOW: {"int","float","bool","void"}
-var_decl ::= var_type IDENT ";" 
 
 FIRST: {"void","int","float","bool"}
 FOLLOW: {IDENT}
@@ -54,14 +57,9 @@ FIRST: {"int","float","bool"}
 FOLLOW: {IDENT}
 var_type  ::= "int" |  "float" |  "bool"
 
-FIRST: {"void","int","float","bool"}
-FOLLOW: {"int","float","bool","void"}
-fun_decl ::= type_spec IDENT "(" params ")" block
-
 FIRST: {"void",epsilon,"int","float","bool"}
 FOLLOW: {")"}
-params ::= param_list  
-        |  "void" | epsilon
+params ::= param_list  |  "void" | epsilon
 
 FIRST: {"int","float","bool"}
 FOLLOW: {")"}

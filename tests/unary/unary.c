@@ -7,7 +7,6 @@ float unary(int n, float m){
         float sum;
        
         sum = 0.0;
-	
 	result = n + m;  
 	print_float(result);
         sum = sum + result;

@@ -396,7 +396,7 @@ static void putBackToken(TOKEN tok) { tok_buffer.push_front(tok); }
 class ASTnode {
 public:
 	virtual ~ASTnode() {}
-	virtual Value *codegen() = 0;
+	// virtual Value *codegen() = 0;
 	virtual string to_string() const {};
 };
 
@@ -533,6 +533,7 @@ public:
 // };
 
 
+// class DeclAST; 
 
 enum VAR_TYPE {
 	VOID_TYPE = 0,
@@ -540,6 +541,7 @@ enum VAR_TYPE {
 	FLOAT_TYPE,
 	BOOL_TYPE
 };
+
 const std::string VarStr(VAR_TYPE type)
 {
     switch (type)
@@ -548,118 +550,435 @@ const std::string VarStr(VAR_TYPE type)
         case INT_TYPE: return "int";
         case FLOAT_TYPE: return "float";
         case BOOL_TYPE: return "bool";
+		default: return "";
     }
 }
 
-class DeclAST;
 
-class ExprAST : public ASTnode{
-	int x;
-};
-class IfAST : public ASTnode{
-	int x;
-};
-class WhileAST : public ASTnode{
-	int x;
-};
-class ReturnAST : public ASTnode{
-	int x;
-};
+// class UnaryExprAST : public ASTnode {
+// 	char Op;
+// 	unique_ptr<ExprAST> Expr; 
 
-class StmtAST : public ASTnode{
-	TOKEN Tok; 
-	std::unique_ptr<ExprAST> Expr;
-	std::unique_ptr<IfAST> If;
-	std::unique_ptr<WhileAST> While;
-	std::unique_ptr<ReturnAST> Return;
+// public:
+// 	UnaryExprAST(char op, unique_ptr<ASTnode> Expr) 
+// 		: Op(op), Expr(std::move(Expr)) {}
+
+// 	virtual string to_string() const override {
+// 		return Op + Expr->to_string();
+// 	};
+// };
+
+
+// class ExprAST : public ASTnode{
+// 	TOKEN Tok;
+// 	std::string Ident;
+// 	std::unique_ptr<ExprAST> Expr; 
+
+// public:
+// 	ExprAST(Token Tok, const std::string &Ident, std::unqiue_ptr<ExprAST> Expr)
+// 		: Tok(std::move(Tok)), Ident(Ident), Expr(std::move(Expr)) {}
+	
+// 	virtual std::string to_string() const override{
+		
+// 		// Basically just check if Ident is empty -> then the thing else -> ident=123
+// 		return Ident + " = " + Expr->to_string();
+// 	}
+// };
+
+// class IfAST : public ASTnode{
+// 	TOKEN Tok;
+// 	std::unique_ptr<ExprAST> ConditionExpr;
+// 	std::unique_ptr<BlockAST> TrueBlock; 
+// 	std::unique_ptr<BlockAST> ElseBlock; 
+
+// public:
+// 	IfAST(TOKEN Tok, std::unqiue_ptr<ExprAST> ConditionExpr, std::unique_ptr<BlockAST> TrueBlock, std::unqiue_ptr<BlockAST> ElseBlock)
+// 		: Tok(std::move(Tok)), ConditionExpr(std::move(ConditionExpr)), TrueBlock(std::move(TrueBlock)), ElseBlock(std::move(ElseBlock)) {}
+	
+// 	virtual std::string to_string() const override{
+// 		return "IF ( " + ConditionExpr->to_string() + " )" + "-finish this later";
+//  	};
+// };
+// class WhileAST : public ASTnode{
+// 	TOKEN Tok; 
+// 	std::unique_ptr<ExprAST> ConditionExpr;
+// 	std::unique_ptr<BlockAST> LoopBlock; 
+
+// public: 
+// 	WhileAST(TOKEN Tok, std::unqiue_ptr<ExprAST> ConditionExpr, std::unique_ptr<BlockAST> LoopBlock)
+// 		: Tok(std::move(Tok)), ConditionExpr(std::move(ConditionExpr)), LoopBlock(std::move(LoopBlock)) {}
+	
+// 	virtual std::string to_string() const override{
+// 		return "WHILE ( " + ConditionExpr->to_string() + " )" + "-finish this later";
+// 	};
+// };
+
+// class StmtAST : public ASTnode{
+// 	TOKEN Tok; 
+// 	std::unique_ptr<ExprAST> Expr;
+// 	std::unique_ptr<IfAST> If;
+// 	std::unique_ptr<WhileAST> While;
+// 	std::unique_ptr<ExprAST> Return;
+
+// public:
+// 	StmtAST(TOKEN Tok, std::unique_ptr<ExprAST> Expr, std::unique_ptr<IfAST> If, std::unique_ptr<WhileAST> While, std::unique_ptr<ReturnAST> Return)
+// 		: Tok(std::move(Tok)), Expr(std::move(Expr)), If(std::move(If)), While(std::move(While)), Return(std::move(Return)) {}
+	
+// 	virtual std::string to_string() const override{
+// 		return "fk";
+// 	};
+// };
+
+// class BlockAST : public ASTnode{
+// 	TOKEN Tok;
+// 	std::vector<std::unique_ptr<DeclAST>> Block_Decl_List; 
+// 	std::vector<std::unique_ptr<StmtAST>> Block_Stmt_List;
+
+// public:
+// 	BlockAST(std::vector<std::unique_ptr<DeclAST>> Block_Decl_List, std::vector<std::unique_ptr<StmtAST>> Block_Stmt_List, TOKEN Tok)
+// 		: Block_Decl_List(std::move(Block_Decl_List)), Block_Stmt_List(std::move(Block_Stmt_List)), Tok(std::move(Tok)) {}
+	
+// 	virtual std::string to_string() const override{
+// 		return "fl";
+// 	};
+// };
+
+// class ParamAST : public ASTnode {
+// 	TOKEN Tok;
+// 	VAR_TYPE Type;
+// 	std::string Ident;
+
+// public:
+// 	ParamAST(VAR_TYPE Type, const std::string &Ident, TOKEN Tok)
+// 		: Type(Type), Ident(Ident), Tok(std::move(Tok)) {}
+	
+// 	virtual std::string to_string() const override{
+// 		return VarStr(Type) + " " + Ident;
+// 	};
+// };
+
+// class ExternAST : public ASTnode {
+// 	TOKEN Tok; 
+// 	VAR_TYPE Type;
+// 	std::string Ident; 
+// 	std::vector<std::unique_ptr<ParamAST>> Params_List;
+
+// public:
+// 	ExternAST(VAR_TYPE Type, const std::string &Ident, std::vector<std::unique_ptr<ParamAST>> Params_List, TOKEN Tok)
+// 		: Type(Type), Ident(Ident), Params_List(std::move(Params_List)), Tok(std::move(Tok)) {}
+	
+// 	virtual std::string to_string() const override{
+// 		return "shit";
+// 	};
+// };
+
+// class DeclAST : public ASTnode{
+// 	TOKEN Tok;
+// 	VAR_TYPE Type;
+// 	std::vector<std::unique_ptr<ParamAST>> Params_List;
+// 	std::unique_ptr<BlockAST> Block; 
+
+// public:
+// 	DeclAST(std::vector<std::unique_ptr<ParamAST>> Params_List, std::unique_ptr<BlockAST> Block, VAR_TYPE Type, TOKEN Tok)
+// 		: Params_List(std::move(Params_List)), Block(std::move(Block)), Tok(std::move(Tok)), Type(Type) {}
+
+// 	virtual std::string to_string() const override{
+// 		return "";
+// 	};
+// };
+
+class FuncDeclAST;
+class VariableDeclAST;
+class DeclAST; 
+class BlockAST; 
+class ExprAST; 
+class StmtAST;
+class IfAST;
+class WhileAST; 
+class BinaryExprAST;
+class UnaryExprAST; 
+
+/// ==================================== Program & Decls START !! =============================================== ///
+#pragma region
+class ProgramAST : public ASTnode {
+	std::vector<std::unique_ptr<FuncDeclAST>> Extern_List; 
+	std::vector<std::unique_ptr<DeclAST>> Decl_List;
+	
 
 public:
-	StmtAST(TOKEN Tok, std::unique_ptr<ExprAST> Expr, std::unique_ptr<IfAST> If, std::unique_ptr<WhileAST> While, std::unique_ptr<ReturnAST> Return)
-		: Tok(std::move(Tok)), Expr(std::move(Expr)), If(std::move(If)), While(std::move(While)), Return(std::move(Return)) {}
-	
-	virtual string to_string() const override{
-		return "fk";
-	};
+	ProgramAST(std::vector<std::unique_ptr<FuncDeclAST>> Extern_List, std::vector<std::unique_ptr<DeclAST>> Decl_List)
+		: Extern_List(std::move(Extern_List)), Decl_List(std::move(Decl_List)) {}
+
+	// virtual std::string to_string() const override{
+	// 	return Extern_List->to_string() + " " + Decl_Func_List->to_string() + " " + Decl_Var_List->to_string();
+	// };
 };
 
-class BlockAST : public ASTnode{
-	TOKEN Tok;
-	std::vector<std::unique_ptr<DeclAST>> Block_Decl_List; 
-	std::vector<std::unique_ptr<StmtAST>> Block_Stmt_List;
+class DeclAST : public ASTnode { 
+	std::unique_ptr<FuncDeclAST> FuncDecl; 
+	std::unique_ptr<VariableDeclAST> VarDecl;
 
 public:
-	BlockAST(std::vector<std::unique_ptr<DeclAST>> Block_Decl_List, std::vector<std::unique_ptr<StmtAST>> Block_Stmt_List, TOKEN Tok)
-		: Block_Decl_List(std::move(Block_Decl_List)), Block_Stmt_List(std::move(Block_Stmt_List)), Tok(std::move(Tok)) {}
-	
-	virtual string to_string() const override{
-		return "fl";
-	};
+	DeclAST(std::unique_ptr<FuncDeclAST> FuncDecl, std::unique_ptr<VariableDeclAST> VarDecl)
+		: FuncDecl(std::move(FuncDecl)), VarDecl(std::move(VarDecl)) {}
+
+	// virtual std::string to_string() const override{
+	// 	return Extern_List->to_string() + " " + Decl_Func_List->to_string() + " " + Decl_Var_List->to_string();
+	// };
 };
+
+#pragma endregion
+/// =================================== !! Program & Decls END !! ================================================ ///
+
+/// =================================== !! Functions Start !! ================================================ ///
+#pragma region
 
 class ParamAST : public ASTnode {
-	TOKEN Tok;
 	VAR_TYPE Type;
 	std::string Ident;
 
 public:
-	ParamAST(VAR_TYPE Type, const std::string &Ident, TOKEN Tok)
-		: Type(Type), Ident(Ident), Tok(std::move(Tok)) {}
+	ParamAST(const std::string &Ident, VAR_TYPE Type)
+		: Type(Type), Ident(Ident) {}
 	
-	virtual string to_string() const override{
-		return VarStr(Type) + " " + Ident;
-	};
+	// virtual std::string to_string() const override{
+	// 	return VarStr(Type) + " " + Ident;
+	// };
 };
 
-class ExternAST : public ASTnode {
-	TOKEN Tok; 
+class FuncDeclAST : public ASTnode{
 	VAR_TYPE Type;
 	std::string Ident; 
-	std::vector<std::unique_ptr<ParamAST>> Params_List;
+	std::vector<std::unique_ptr<ParamAST>> Params;
+	
+	//May be null - in the case of extern 
+	std::unique_ptr<BlockAST> FuncBlock; 
 
 public:
-	ExternAST(VAR_TYPE Type, const std::string &Ident, std::vector<std::unique_ptr<ParamAST>> Params_List, TOKEN Tok)
-		: Type(Type), Ident(Ident), Params_List(std::move(Params_List)), Tok(std::move(Tok)) {}
+	FuncDeclAST(const std::string &Ident, VAR_TYPE Type, std::vector<std::unique_ptr<ParamAST>> Params, std::unique_ptr<BlockAST> FuncBlock)
+		: Ident(Ident), Type(Type), Params(std::move(Params)), FuncBlock(std::move(FuncBlock)) {}
 	
-	virtual std::string to_string() const override{
-		return "shit";
-	};
+	// virtual std::string to_string() const override{
+	// 	return VarStr(Type) + " " + Name + Params->to_string() + FuncBlock->to_string() ;
+	// }
 };
 
-class DeclAST : public ASTnode{
-	TOKEN Tok;
-	VAR_TYPE Type;
-	std::vector<std::unique_ptr<ParamAST>> Params_List;
+class FuncCallAST : public ASTnode {
+	std::string FuncName; 
+	std::vector<std::unique_ptr<ExprAST>> Args; 
+
+public:
+	FuncCallAST(const std::string &FuncName, std::vector<std::unique_ptr<ExprAST>> Args)
+		: FuncName(FuncName), Args(std::move(Args)) {}
+
+	// virtual std::string to_string() const override{
+	// 	return FuncName + " Add call";
+	// }
+};
+
+#pragma endregion
+/// =================================== !! Functions End !! ================================================ ///
+
+/// =================================== !! Variable's START !! ================================================ ///
+#pragma region
+class Variable : public ASTnode {
+	std::string Ident; 
+
+public: 
+	Variable(const std::string &Ident)
+		: Ident(Ident){}
+	
+	// virtual std::string to_string() const override{
+	// 	return Ident;
+	// };
+};
+
+class VariableDeclAST : public ASTnode {
+	VAR_TYPE Type; 
+	std::string Ident; 
+
+public: 
+	VariableDeclAST(const std::string &Ident, VAR_TYPE Type)
+		: Ident(Ident), Type(Type) {}
+
+	// virtual std::string to_string() const override{
+	// 	return VarStr(Type) + " " + Name;
+	// };
+};
+class VariableAssignment : public ASTnode {
+	std::string Ident; 
+	std::unique_ptr<ExprAST> Expr; 
+
+public:
+	VariableAssignment(const std::string &Ident, std::unique_ptr<ExprAST> Expr)
+		: Ident(Ident), Expr(std::move(Expr)) {} 	
+
+	// virtual std::string to_string() const override{
+	// 	return Ident + " = " + Expr; 
+	// };
+};
+
+#pragma endregion
+/// =================================== !! Variable's END !! ================================================ ///
+
+/// =================================== !! Block & Stmts Start !! ================================================ ///
+#pragma region
+
+class BlockAST : public ASTnode{
+	std::vector<std::unique_ptr<VariableDeclAST>> VarDecls; 
+	std::vector<std::unique_ptr<StmtAST>> StmtList;
+
+public:
+	BlockAST(std::vector<std::unique_ptr<VariableDeclAST>> VarDecls, std::vector<std::unique_ptr<StmtAST>> StmtList)
+		: VarDecls(std::move(VarDecls)), StmtList(std::move(StmtList)) {}
+	
+	// virtual std::string to_string() const override{
+	// 	return "fl";
+	// };
+};
+
+class StmtAST : public ASTnode{
+	std::unique_ptr<ExprAST> Expr;
+	std::unique_ptr<IfAST> If;
+	std::unique_ptr<WhileAST> While;
+	std::unique_ptr<ExprAST> Return;
 	std::unique_ptr<BlockAST> Block; 
 
 public:
-	DeclAST(std::vector<std::unique_ptr<ParamAST>> Params_List, std::unique_ptr<BlockAST> Block, VAR_TYPE Type, TOKEN Tok)
-		: Params_List(std::move(Params_List)), Block(std::move(Block)), Tok(std::move(Tok)), Type(Type) {}
-	virtual std::string to_string() const override{
-		return "";
-	};
+	StmtAST(std::unique_ptr<ExprAST> Expr, std::unique_ptr<IfAST> If, std::unique_ptr<WhileAST> While, std::unique_ptr<ExprAST> Return, std::unique_ptr<BlockAST> Block)
+		: Expr(std::move(Expr)), If(std::move(If)), While(std::move(While)), Return(std::move(Return)), Block(std::move(Block)) {}
+	
+	// virtual std::string to_string() const override{
+	// 	return "fk";
+	// };
 };
 
-class ProgramAST : public ASTnode {
-	TOKEN Tok; 
-	std::vector<std::unique_ptr<ExternAST>> Extern_List; 
-	std::vector<std::unique_ptr<DeclAST>> Decl_List;
+#pragma endregion
+/// =================================== !! Block & Stmt End !! ================================================ ///
+
+/// =================================== !! If & While & Expr AST Start !! ================================================ ///
+#pragma region
+class ExprAST : public ASTnode{
+	std::unique_ptr<VariableAssignment> VarAss; 
+	std::unique_ptr<BinaryExprAST> BinaryExpr; 
+	std::unique_ptr<UnaryExprAST> UnaryExpr;
 
 public:
-	ProgramAST(std::vector<std::unique_ptr<ExternAST>> Extern_List, std::vector<std::unique_ptr<DeclAST>> Decl_List, TOKEN Tok)
-		: Extern_List(std::move(Extern_List)), Decl_List(std::move(Decl_List)), Tok(std::move(Tok)) {}
+	ExprAST(std::unique_ptr<VariableAssignment> VarAss, std::unique_ptr<BinaryExprAST> BinaryExpr, std::unique_ptr<UnaryExprAST> UnaryExpr)
+		: VarAss(std::move(VarAss)), BinaryExpr(std::move(BinaryExpr)), UnaryExpr(std::move(UnaryExpr)) {}
+	
+	// virtual std::string to_string() const override{
+	// 	return "Fix this";
+	// };
+};
 
-	virtual std::string to_string() const override{
-		return "fk"; 
+class IfAST : public ASTnode{
+	std::unique_ptr<ExprAST> ConditionExpr;
+	std::unique_ptr<BlockAST> TrueBlock; 
+	std::unique_ptr<BlockAST> ElseBlock; 
+public:
+	IfAST(std::unique_ptr<ExprAST> ConditionExpr, std::unique_ptr<BlockAST> TrueBlock, std::unique_ptr<BlockAST> ElseBlock)
+		: ConditionExpr(std::move(ConditionExpr)), TrueBlock(std::move(TrueBlock)), ElseBlock(std::move(ElseBlock)) {}
+	
+	// virtual std::string to_string() const override{
+	// 	return "IF ( )" + "-finish this later";
+ 	// };
+};
+class WhileAST : public ASTnode{
+	std::unique_ptr<ExprAST> ConditionExpr;
+	std::unique_ptr<BlockAST> LoopBlock; 
+
+public: 
+	WhileAST(std::unique_ptr<ExprAST> ConditionExpr, std::unique_ptr<BlockAST> LoopBlock)
+		: ConditionExpr(std::move(ConditionExpr)), LoopBlock(std::move(LoopBlock)) {}
+	
+	// virtual std::string to_string() const override{
+	// 	return "WHILE ( )" + "-finish this later";
+	// };
+};
+#pragma endregion
+/// =================================== !! If & While & Expr AST Start !! ================================================ ///
+
+/// =================================== !! Binary / Unary AST Start !! ================================================ ///
+#pragma region
+/// BinaryExpAST - Class for variable names 
+class BinaryExprAST : public ASTnode {
+	char Op;
+	std::unique_ptr<ExprAST> LHS; 
+	std::unique_ptr<ExprAST> RHS; 
+
+public:
+	BinaryExprAST(char op, std::unique_ptr<ExprAST> LHS, std::unique_ptr<ExprAST> RHS) 
+		: Op(op), LHS(std::move(LHS)), RHS(std::move(RHS)) {}
+
+	// virtual std::string to_string() const override {
+	// 	return "need to implement";
+	// };
+};
+/// UnaryExpAST - Class for variable names 
+class UnaryExprAST : public ASTnode {
+	char Op;
+	std::unique_ptr<ExprAST> Expr; 
+
+public:
+	UnaryExprAST(char op, std::unique_ptr<ExprAST> Expr) 
+		: Op(op), Expr(std::move(Expr)) {}
+
+	// virtual std::string to_string() const override {
+	// 	return "need to fix";
+	// };
+};
+#pragma endregion
+/// =================================== !! Binary / Unary AST End !! ================================================ ///
+
+/// =================================== !! Literal AST Start !! ================================================ ///
+#pragma region
+//IntegerAST - Class for numeric literals like 1, 2, 10, 10
+class IntegerAST : public ASTnode {
+	int Val;
+
+public:
+	IntegerAST(int Val) 
+		: Val(Val){}
+
+	virtual string to_string() const override {
+		return std::to_string(Val);
+	};
+};
+/// FloatAST - Class for float literals like 1.3 2.1
+class FloatAST : public ASTnode {
+	float Val;
+
+public:
+	FloatAST(float Val) 
+		: Val(Val){}
+
+	virtual string to_string() const override {
+		return std::to_string(Val);
 	};
 };
 
+/// Bool - Class for bool literals like True, False
+class BoolAST : public ASTnode {
+	bool Val;
+
+public:
+	BoolAST(bool Val) 
+		: Val(Val){}
+
+	virtual string to_string() const override {
+		return std::to_string(Val);
+	};
+};
+
+#pragma endregion
+// =================================== !! Literal AST End !! ================================================ ///
 
 /* add other AST nodes as nessasary */
 
 //===----------------------------------------------------------------------===//
 // Recursive Descent Parser - Function call for each production
 //===----------------------------------------------------------------------===//
-
 
 // ----- Helper Functions ------ // 
 /* Add function calls for each production */
@@ -672,11 +991,11 @@ public:
         return Err.c_str();
     }
 };
-static void Match(TOKEN_TYPE expectedTokenType, string expectedTokenLexeme, const char * prodRule = __builtin_FUNCTION()){
+static void Match(TOKEN_TYPE expectedTokenType, string errMessage, const char * prodRule = __builtin_FUNCTION()){
 	if (CurTok.type != expectedTokenType){
-		throw ParseException("Invalid Token Error: Expected: " + expectedTokenLexeme + "");
+		throw ParseException("Invalid Token Error: " + errMessage);
 	}
-	cout << "Production Rule: " << prodRule << endl << "Matched " << expectedTokenLexeme << ": " << CurTok.lexeme << endl << endl; 
+	cout << "[FOR TESTING] : Production Rule: " << prodRule << endl << "Matched: " << CurTok.lexeme << endl << endl; 
 	getNextToken();
 }
 // ----- Helper Functions End ------ // 
@@ -716,7 +1035,7 @@ static void Arg_List(){
 		case MINUS:
 			Expr();
 			Arg_List_Prime();
-			break;
+			break; 	
 		default:
 			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS}");
 	}
@@ -1384,44 +1703,61 @@ static void Local_Decls(){
 	}
 }
 
-static void Block(){
+// block ::= "{" local_decls stmt_list "}"
+static std::unique_ptr<BlockAST> Block(){
 	// cout << "Block" << endl;
+	std::vector<std::unique_ptr<VariableDeclAST>> variable_decls;
+	std::vector<std::unique_ptr<StmtAST>> stmt_list; 
 	switch (CurTok.type)
 	{
 		case LBRA:
-			Match(LBRA, "LBRA");
-			Local_Decls();
-			Stmt_List();
-			Match(RBRA, "RBRA");
+			Match(LBRA, "Expected '{' to declare new scope. ");
+			variable_decls = Local_Decls();
+			stmt_list = Stmt_List();
+			Match(RBRA, "Expected '}' after statement. ");
 			break;
 		default:
 			throw ParseException("Invalid Token Error: \nExpected: {LBRA}");
 	}
+
+	return std::make_unique<BlockAST>(variable_decls, stmt_list);
 }
 
-static void Param(){
+// param ::= var_type IDENT
+static std::unique_ptr<ParamAST> Param(){
 	// cout << "Param" << endl;
+	VAR_TYPE type;
+	std::string ident; 
+
 	switch (CurTok.type)
 	{
 		case BOOL_TOK:
 		case FLOAT_TOK:
 		case INT_TOK:
-			Var_Type();
-			Match(IDENT, "IDENT");
+			type = Var_Type();
+			
+			TOKEN prev_token = CurTok;
+			Match(IDENT, "Expected identifer after paramter type. ");
+			ident = prev_token.lexeme;
+
 			break;
 		default:
 			throw ParseException("Invalid Token Error: \nExpected: {BOOL_TOK, FLOAT_TOK, INT_TOK}");
 	}
+
+	return std::make_unique<ParamAST>(ident, type);
 }
 
-static void Param_List_Prime(){
+static void Param_List_Prime(std::vector<std::unique_ptr<ParamAST>> &param_list){
 	// cout << "Param_List_Prime" << endl;
 	switch (CurTok.type)
 	{
 		case COMMA:
-			Match(COMMA, "COMMA");
-			Param();
-			Param_List_Prime();
+			Match(COMMA, "Expected ',' or ')' after function parameter");
+			auto param = Param();
+			param_list.push_back(param);
+
+			Param_List_Prime(param_list);
 			break;
 		case RPAR:
 			break;
@@ -1430,155 +1766,214 @@ static void Param_List_Prime(){
 	}
 }
 
-static void Param_List(){
-	// cout << "Param_List" << endl;
+// param_list ::= param param_list_prime 
+static std::vector<std::unique_ptr<ParamAST>> Param_List(){
+	std::vector<std::unique_ptr<ParamAST>> param_list; 
 	switch (CurTok.type)
 	{
 		case BOOL_TOK:
 		case FLOAT_TOK:
 		case INT_TOK:
-			Param();
-			Param_List_Prime();
+			auto param = Param();
+			param_list.push_back(param);
+
+			Param_List_Prime(param_list);
 			break;
 		default:
 			throw ParseException("Invalid Token Error: \nExpected: {BOOL_TOK, FLOAT_TOK, INT_TOK}");
 	}
+
+	return param_list; 
 }
 
-static void Params(){
-	// cout << "Params" << endl;
+// params ::= param_list  |  "void" | epsilon
+static std::vector<std::unique_ptr<ParamAST>> Params(){
+	std::vector<std::unique_ptr<ParamAST>> param_list; 
 	switch (CurTok.type)
 	{
 		case RPAR:
 			break;
 		case VOID_TOK:
-			Match(VOID_TOK, "VOID_TOK");
+			Match(VOID_TOK, "Expected 'void' token in function paramters");
 			break;
 		case BOOL_TOK:
 		case FLOAT_TOK:
 		case INT_TOK:
-			Param_List();
+			param_list = Param_List();
 			break;
 		default:
 			throw ParseException("Invalid Token Error: \nExpected: {RPAR, VOID_TOK, BOOL_TOK, FLOAT_TOK, INT_TOK}");
 	}
+
+	return param_list; 
 }
 
 
-static void Func_Decl(){
-	// cout << "Func_Decl" << endl;
-	switch (CurTok.type)
-	{
-		case VOID_TOK:
-		case BOOL_TOK:
-		case FLOAT_TOK:
-		case INT_TOK:
-			Type_Spec();
-			Match(IDENT, "IDENT");
-			Match(LPAR, "LPAR");
-			Params();
-			Match(RPAR, "RPAR");
-			Block();
-			break;
-		default:
-			throw ParseException("Invalid Token Error: \nExpected: {VOID_TOK, BOOL_TOK, FLOAT_TOK, INT_TOK}");
-	}
-}
 
-static void Var_Type(){
+static VAR_TYPE Var_Type(){
 	// cout << "Var_Type" << endl;
+	VAR_TYPE type; 
 	switch (CurTok.type)
 	{
 		case BOOL_TOK:
-			Match(BOOL_TOK, "BOOL_TOK");
+			Match(BOOL_TOK, "Expected 'bool' keyword.");
+			type = BOOL_TYPE;
 			break;
 		case FLOAT_TOK:
-			Match(FLOAT_TOK, "FLOAT_TOK");
+			Match(FLOAT_TOK, "Expected 'float' keyword.");
+			type = FLOAT_TYPE;
 			break;
 		case INT_TOK:
-			Match(INT_TOK, "INT_TOK");
+			Match(INT_TOK, "Expected 'int' keyword.");
+			type = INT_TYPE;
 			break;
 		default:
 			throw ParseException("Invalid Token Error: \nExpected: {BOOL_TOK, FLOAT_TOK, INT_TOK}");
 	}
-}
+	return type; 
+}	
 
-static void Type_Spec(){
+static VAR_TYPE Type_Spec(){
 	// cout << "Type_Spec" << endl;
+	VAR_TYPE type; 
 	switch (CurTok.type)
 	{
 		case VOID_TOK:
-			Match(VOID_TOK, "VOID_TOK");
+			Match(VOID_TOK, "Expected 'void' keyword.");
+			type = VOID_TYPE; 
 			break;
 		case BOOL_TOK:
 		case FLOAT_TOK:
 		case INT_TOK:
-			Var_Type();
+			type = Var_Type();
 			break;
 		default:
 			throw ParseException("Invalid Token Error: \nExpected: {VOID_TOK, BOOL_TOK, FLOAT_TOK, INT_TOK}");
 	} 
+	return type; 
 }
+// fun_decl ::= type_spec IDENT "(" params ")" block
+// static std::unique_ptr<FuncDeclAST> Func_Decl(){
+// 	// cout << "Func_Decl" << endl;
+// 	VAR_TYPE type;
+// 	std::unique_ptr<BlockAST> block;
+// 	std::unique_ptr<ParamAST> params; 
 
-static void Var_Decl(){
-	// cout << "Var_Decl" << endl;
-	switch (CurTok.type)
-	{
-		case BOOL_TOK:
-		case FLOAT_TOK:
-		case INT_TOK:
-			Var_Type();
-			Match(IDENT, "IDENT");
-			Match(SC, "SC");
-			break;
-		default:
-			throw ParseException("Invalid Token Error: \nExpected: {BOOL_TOK, FLOAT_TOK, INT_TOK}");
-	} 
-}
+// 	switch (CurTok.type)
+// 	{
+// 		case VOID_TOK:
+// 		case BOOL_TOK:
+// 		case FLOAT_TOK:
+// 		case INT_TOK:
+// 			type = Type_Spec();
+// 			Match(IDENT, "Expected identifer after type decleration. ");
+// 			Match(LPAR, "Expected '(' after function decleration. ");
+// 			params = Params();
+// 			Match(RPAR, "Expected ')' after function parameters");
+// 			Block();
+// 			break;
+// 		default:
+// 			throw ParseException("Invalid Token Error: \nExpected: {VOID_TOK, BOOL_TOK, FLOAT_TOK, INT_TOK}");
+// 	}
+// }
 
-static void Decl_Prime(){
+// var_decl ::= var_type IDENT ";"
+// static std::make_unique<VariableDeclAST> Var_Decl(){
+// 	VAR_TYPE type;
+// 	std::string ident; 
+
+// 	switch (CurTok.type)
+// 	{
+// 		case BOOL_TOK:
+// 		case FLOAT_TOK:
+// 		case INT_TOK:
+// 			type = Var_Type();
+
+// 			TOKEN prev_token = CurTok;
+// 			Match(IDENT, "Expected identifer after type decleration. ");
+// 			ident = prev_token.lexeme;
+
+// 			Match(SC, "Expeceted ';' after variable decleration. ");
+
+// 			break;
+// 		default:
+// 			throw ParseException("Invalid Token Error: \nExpected: {BOOL_TOK, FLOAT_TOK, INT_TOK}");
+// 	} 
+// 	return std::make_unique<VariableDeclAST>(ident, type);
+// }
+
+// decl_prime ::= ";" | "(" params ")" block
+static void Decl_Prime(std::unique_ptr<FuncDeclAST> &func_decl, std::unique_ptr<VariableDeclAST> &var_decl, VAR_TYPE type, const std::string &ident){
 	// cout << "Decl_Prime" << endl;
 	switch (CurTok.type)
 	{
 		case LPAR:
-			Match(LPAR, "LPAR");
-			Params();
-			Match(RPAR, "RPAR");
-			Block();
+			Match(LPAR, "Expected '(' after function decleration. ");
+
+			auto params = Params();
+
+			Match(RPAR, "Expected ')' after function paramters. ");
+
+			auto block = Block();
+			
+			func_decl = std::make_unique<FuncDeclAST>(ident, type, params, block);
 			break;
 		case SC:
-			Match(SC, "SC");
+			Match(SC, "Expected ';' after variable decleration. ");
+
+			var_decl = std::make_unique<VariableDeclAST>(ident, type);
 			break;
 		default:
 			throw ParseException("Invalid Token Error: \nExpected: {LPAR, SC}");
 	} 
 }
 
-static void Decl() {
+// decl ::= var_type IDENT decl_prime | "void" IDENT "(" params ")" block
+static std::unique_ptr<DeclAST> Decl() {
 	// cout << "Decl" << endl;
+	std::unique_ptr<FuncDeclAST> func_decl; 
+	std::unique_ptr<VariableDeclAST> var_decl; 
+	TOKEN prev_token; 
+
 	switch (CurTok.type)
 	{
 		case VOID_TOK:
-			Match(VOID_TOK, "VOID_TOK");
-			Match(IDENT, "IDENT");
-			Match(LPAR, "LPAR");
-			Params();
-			Match(RPAR, "RPAR");
-			Block();
+			Match(VOID_TOK, "Expected 'void' token before function decleration. ");
+
+			prev_token = CurTok; 
+			Match(IDENT, "Expected funtion identifer after 'void' token. ");
+			std::string ident = prev_token.lexeme; 
+
+			Match(LPAR, "Expeceted '(' after function identifer. ");
+			
+			auto params = Params();
+			
+			Match(RPAR, "Expected ')' after parameter list. ");
+			
+			auto block = Block();
+
+			func_decl = std::make_unique<FuncDeclAST>(ident, VOID_TYPE, params, block);
 			break;
 		case BOOL_TOK:
 		case FLOAT_TOK:
 		case INT_TOK:
-			Var_Type();
-			Match(IDENT, "IDENT");
-			Decl_Prime();
+			auto type = Var_Type();
+
+			prev_token = CurTok;
+			Match(IDENT, "Expected identifer after type token. ");
+			std::string ident = prev_token.lexeme; 
+
+
+			Decl_Prime(func_decl, var_decl, type, ident);
 			break;
 		default:
 			throw ParseException("Invalid Token Error: \nExpected: {VOID_TOK, BOOL_TOK, FLOAT_TOK, INT_TOK, EXTERN}");
 	}
+	return std::make_unique<DeclAST>(func_decl, var_decl);
 };
 
-static void Decl_List_Prime(){
+// decl_list_prime ::= decl decl_list_prime | epsilon
+static void Decl_List_Prime(std::unique_ptr<DeclAST> &decl_list){
 	// cout << "Decl_List_Prime" << endl;
 	switch (CurTok.type)
 	{
@@ -1586,8 +1981,10 @@ static void Decl_List_Prime(){
 		case BOOL_TOK:
 		case FLOAT_TOK:
 		case INT_TOK:
-			Decl();
-			Decl_List_Prime();
+			auto decl = Decl();
+			decl_list.push_back(std::move(decl));
+
+			Decl_List_Prime(std::move(decl_list));
 			break;
 		case EOF_TOK:
 			break;
@@ -1596,55 +1993,77 @@ static void Decl_List_Prime(){
 	}
 }
 
-static void Decl_List() {
-	// cout << "Decl_List" << endl;
+// decl_list ::= decl decl_list_prime 
+static std::vector<std::unique_ptr<DeclAST>> Decl_List() {
+	std::vector<std::unique_ptr<DeclAST>> decl_list;
 	switch (CurTok.type)
 	{
 		case VOID_TOK:
 		case BOOL_TOK:
 		case FLOAT_TOK:
 		case INT_TOK:
-			Decl();
-			Decl_List_Prime();
+			auto decl = Decl();
+			decl_list.push_back(std::move(decl));
+
+			Decl_List_Prime(std::move(decl_list));
 			break;
 		default:
 			throw ParseException("Invalid Token Error: \nExpected: {VOID_TOK, BOOL_TOK, FLOAT_TOK, INT_TOK}");
 	}
+	return decl_list;
 };
 
 
-static void Extern(){
+// extern ::= "extern" type_spec IDENT "(" params ")" ";"
+static std::unique_ptr<FuncDeclAST> Extern(){
 	// cout << "Extern" << endl;
+	std::string ident; 
+	VAR_TYPE type; 
+	std::unique_ptr<ParamAST> params; 
 	switch (CurTok.type)
 	{
 		case EXTERN:
 			Match(EXTERN, "EXTERN");
-			Type_Spec();
-			Match(IDENT, "IDENT");
-			Match(LPAR, "LPAR");
-			Params();
-			Match(RPAR, "RPAR");
-			Match(SC, "SC");
+
+			auto type = Type_Spec();
+			
+			// Error thrown if 'IDENT' not found 
+			// Implies, if Match doesn't throw an error, previous token's lexeme was the identifer (Match gets the next token)
+			TOKEN prev_token = CurTok;
+			Match(IDENT, "Expected identifier after type keyword.");
+			ident = prev_token.lexeme; 
+
+
+			Match(LPAR, "Expected '(' after identifer keyword.");
+			params = Params();
+			Match(RPAR, "Expected ')' after function paramters.");
+
+			Match(SC, "Expected ';' after function definition.");
 			break;
 		default:
 			throw ParseException("Invalid Token Error: \nExpected: {EXTERN}");
 	}
+
+	return std::make_unique<FuncDeclAST>(ident, type, params, nullptr);
 }
 
 // extern_list_prime ::= extern extern_list_prime | epsilon
-static void Extern_List_Prime(){
+static void Extern_List_Prime(std::vector<std::unique_ptr<FuncDeclAST>> &extern_list){
+
 	// cout << "Extern_List_Prime" << endl;
 	switch (CurTok.type)
 	{
 		case EXTERN:
-			Extern();
-			Extern_List_Prime();
+			auto E = Extern();
+			extern_list.push_back(std::move(E));
+
+			Extern_List_Prime(std::move(extern_list));
 			break;
 		case VOID_TOK:
 		case BOOL_TOK:
 		case FLOAT_TOK:
 		case INT_TOK:
-			return; 
+			break;  
 		default:
 			throw ParseException("Invalid Token Error: \nExpected: {VOID_TOK, BOOL_TOK, FLOAT_TOK, INT_TOK, EXTERN}");
 	}
@@ -1652,45 +2071,53 @@ static void Extern_List_Prime(){
 
 
 // extern_list ::= extern extern_list_prime 
-static void Extern_List() {
-	// cout << "Extern_List" << endl;
+static std::vector<std::unique_ptr<FuncDeclAST>> Extern_List() {
+	std::vector<std::unique_ptr<FuncDeclAST>> extern_list; 
+
 	switch (CurTok.type)
 	{
 		case EXTERN:
-			Extern();
-			Extern_List_Prime();
+			auto E = Extern();
+			extern_list.push_back(std::move(E));
+
+			Extern_List_Prime(extern_list);
 			break;
 		default:
 			throw ParseException("Invalid Token Error: \nExpected {EXTERN}");
 	}
 
+	return extern_list;
 };
 
 // program ::= extern_list decl_list | decl_list
-static void Program(){
-    // cout << "Program" << endl;
+static std::unique_ptr<ASTnode> Program(){
+	std::vector<std::unique_ptr<FuncDeclAST>> extern_list;
+	std::vector<std::unique_ptr<DeclAST>> decl_list;
+
 	switch (CurTok.type)
     {
 		case VOID_TOK:
 		case BOOL_TOK:
 		case FLOAT_TOK:
 		case INT_TOK:
-			Decl_List();
+			decl_list = Decl_List();
 			break;
 		case EXTERN:
-			Extern_List();
-			Decl_List();
+			extern_list = Extern_List();
+			decl_list = Decl_List();
 			break;
 		default:
 			throw ParseException("Invalid Token Error: \nExpected: {VOID_TOK, BOOL_TOK, FLOAT_TOK, INT_TOK, EXTERN}");
     }
+
+	return std::make_unique<ProgramAST>(std::move(extern_list), std::move(decl_list));
 } 	
 
 static void parser(){
 	getNextToken();
 
 	try {
-		Program();
+		auto P = Program();
 		if (CurTok.type != EOF_TOK){
 			throw ParseException("Invalid Token Error: \nExpected: {EOF}");
 		}
@@ -1699,7 +2126,9 @@ static void parser(){
 	}
 }
 
-
+static void ExtendVec(std::vector<std::unique_ptr<ASTnode>> &v1, std::vector<std::unique_ptr<ASTnode>> &v2){
+	v1.insert(v1.end(),v2.begin(),v2.end());
+}
 
 //===----------------------------------------------------------------------===//
 // Code Generation
