@@ -1034,6 +1034,7 @@ static void Stmt();
 static void Var_Type();
 static void Type_Spec();
 
+// arg_list_prime ::= "," expr arg_list_prime | epsilon 
 static void Arg_List_Prime(std::vector<std::unique_ptr<ExprAST>> &args){
 	switch (CurTok.type)
 	{
@@ -1051,6 +1052,7 @@ static void Arg_List_Prime(std::vector<std::unique_ptr<ExprAST>> &args){
 	}
 }
 
+// arg_list ::= expr arg_list_prime 
 static std::vector<std::unique_ptr<ExprAST>> Arg_List(){
 	std::vector<std::unique_ptr<ExprAST>> args;
 	switch (CurTok.type)
@@ -1065,7 +1067,6 @@ static std::vector<std::unique_ptr<ExprAST>> Arg_List(){
 			auto e = Expr();
 			args.push_back(e);
 
-
 			Arg_List_Prime(args);
 			break; 	
 		default:
@@ -1074,6 +1075,7 @@ static std::vector<std::unique_ptr<ExprAST>> Arg_List(){
 	return args; 
 }
 
+// args ::= arg_list |  epsilon
 static std::vector<std::unique_ptr<ExprAST>> Args(){
 	std::vector<std::unique_ptr<ExprAST>> args;
 
@@ -1097,6 +1099,7 @@ static std::vector<std::unique_ptr<ExprAST>> Args(){
 }
 
 
+// rval_term ::= INT_LIT | FLOAT_LIT | BOOL_LIT
 static std::unique_ptr<ExprAST> Rval_Term(){
 	std::unique_ptr<ExprAST> expr; 
 	TOKEN lit_tok; 
@@ -1125,6 +1128,8 @@ static std::unique_ptr<ExprAST> Rval_Term(){
 	}
 	return expr; 
 }
+
+// rval_ident_prime ::= epsilon | "(" args ")" 
 static std::vector<std::unique_ptr<ExprAST>> Rval_Ident_Prime(){
 	std::vector<std::unique_ptr<ExprAST>> args; 
 
@@ -1157,6 +1162,8 @@ static std::vector<std::unique_ptr<ExprAST>> Rval_Ident_Prime(){
 	}
 	return args;
 }
+
+// rval_ident ::= IDENT rval_ident_prime | rval_term 
 static std::unique_ptr<ExprAST> Rval_Ident(){
 	TOKEN ident; 
 	std::unique_ptr<ExprAST> expr; 
@@ -1175,7 +1182,7 @@ static std::unique_ptr<ExprAST> Rval_Ident(){
 			
 			// Since identifer could be function call or variable 
 			// We must identify first if it is a function call or variable 
-			// Then create the correct node depending on which
+			// Then create the correct node depending on which 
 			if (args.size() == 0){
 				expr = std::make_unique<Variable>(ident);
 			} else{
@@ -1188,6 +1195,7 @@ static std::unique_ptr<ExprAST> Rval_Ident(){
 	return expr; 
 }
 
+// rval_par ::= "(" expr ")" | rval_ident
 static std::unique_ptr<ExprAST> Rval_Par(){
 	// cout << "Rval_Par" << endl;
 	std::unique_ptr<ExprAST> expr; 
@@ -1210,6 +1218,7 @@ static std::unique_ptr<ExprAST> Rval_Par(){
 	return expr; 
 }
 
+// rval_neg ::= "-" rval_neg | "!" rval_neg | rval_par 
 static std::unique_ptr<ExprAST> Rval_Neg(){
 	std::unique_ptr<ExprAST> expr;
 	TOKEN op_token; 
@@ -1245,6 +1254,7 @@ static std::unique_ptr<ExprAST> Rval_Neg(){
 	return expr; 
 }
 
+// rval_mul_prime ::= "*" rval_neg  | "/" rval_neg  | "%" rval_neg | epsilon
 static std::unique_ptr<ExprAST> Rval_Mul_Prime(std::unique_ptr<ExprAST> LHS){
 	// cout << "Rval_Mul_Prime" << endl;
 	std::unique_ptr<ExprAST> LHS_Prime; 
@@ -1300,6 +1310,8 @@ static std::unique_ptr<ExprAST> Rval_Mul_Prime(std::unique_ptr<ExprAST> LHS){
 	}
 	return expr;
 }
+
+// rval_mul ::= rval_neg rval_mul_prime 
 static std::unique_ptr<ExprAST> Rval_Mul(){
 	std::unique_ptr<ExprAST> LHS; 
 	std::unique_ptr<ExprAST> expr;
@@ -1314,6 +1326,7 @@ static std::unique_ptr<ExprAST> Rval_Mul(){
 	return expr; 
 }
 
+// rval_add_prime ::= "+" rval_mul  | "-" rval_mul | epsilon
 static std::unique_ptr<ExprAST> Rval_Add_Prime(std::unique_ptr<ExprAST> LHS){
 	// cout << "Rval_Add_Prime" << endl;
 	std::unique_ptr<ExprAST> LHS_Prime; 
@@ -1358,6 +1371,8 @@ static std::unique_ptr<ExprAST> Rval_Add_Prime(std::unique_ptr<ExprAST> LHS){
 	}
 	return expr; 
 }
+
+// rval_add ::= rval_mul rval_add_prime 
 static std::unique_ptr<ExprAST> Rval_Add(){
 	std::unique_ptr<ExprAST> LHS; 
 	std::unique_ptr<ExprAST> expr;
@@ -1371,6 +1386,7 @@ static std::unique_ptr<ExprAST> Rval_Add(){
 	return expr; 
 }
 
+// rval_cmp_prime ::= "<=" rval_add | "<" rval_add | ">=" rval_add | ">" rval_add | epsilon
 static std::unique_ptr<ExprAST> Rval_Cmp_Prime(std::unique_ptr<ExprAST> LHS){
 	std::unique_ptr<ExprAST> LHS_Prime; 
 	std::unique_ptr<ExprAST> RHS; 
@@ -1428,6 +1444,8 @@ static std::unique_ptr<ExprAST> Rval_Cmp_Prime(std::unique_ptr<ExprAST> LHS){
 	}
 	return expr; 
 }
+
+// rval_cmp ::= rval_add rval_cmp_prime 
 static void Rval_Cmp(){
 	std::unique_ptr<ExprAST> LHS; 
 	std::unique_ptr<ExprAST> expr;
@@ -1441,6 +1459,7 @@ static void Rval_Cmp(){
 	return expr; 
 }
 
+// rval_eq_prime ::= "==" rval_cmp | "!=" rval_cmp | epsilon
 static std::unique_ptr<ExprAST> Rval_Eq_Prime(std::unique_ptr<ExprAST> LHS){
 	std::unique_ptr<ExprAST> LHS_Prime; 
 	std::unique_ptr<ExprAST> RHS; 
@@ -1479,6 +1498,8 @@ static std::unique_ptr<ExprAST> Rval_Eq_Prime(std::unique_ptr<ExprAST> LHS){
 
 	return expr; 
 }
+
+// rval_eq ::= rval_cmp rval_eq_prime 
 static std::unique_ptr<ExprAST> Rval_Eq(){
 	std::unique_ptr<ExprAST> LHS; 
 	std::unique_ptr<ExprAST> expr; 
@@ -1493,6 +1514,7 @@ static std::unique_ptr<ExprAST> Rval_Eq(){
 	return expr; 
 }
 
+// rval_and_prime ::= "&&" rval_eq rval_and_prime | epsilon
 static std::unique_ptr<ExprAST> Rval_And_Prime(std::unique_ptr<ExprAST> LHS){
 	std::unique_ptr<ExprAST> LHS_Prime; 
 	std::unique_ptr<ExprAST> RHS; 
@@ -1520,6 +1542,7 @@ static std::unique_ptr<ExprAST> Rval_And_Prime(std::unique_ptr<ExprAST> LHS){
 	return expr 
 }
 
+// rval_and ::= rval_eq rval_and_prime 
 static std::unique_ptr<ExprAST> Rval_And(){
 	std::unique_ptr<ExprAST> LHS; 
 	std::unique_ptr<ExprAST> expr; 

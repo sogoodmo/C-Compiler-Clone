@@ -208,8 +208,7 @@ rval_term ::= INT_LIT | FLOAT_LIT | BOOL_LIT
 
 FIRST: {"-", "!","(",INT_LIT,FLOAT_LIT,BOOL_LIT,IDENT}
 FOLLOW: {")"}
-args ::= arg_list 
-        |  epsilon
+args ::= arg_list |  epsilon
 
 FIRST: {"-","!","(",INT_LIT,FLOAT_LIT,BOOL_LIT,IDENT}
 FOLLOW: {")"}
