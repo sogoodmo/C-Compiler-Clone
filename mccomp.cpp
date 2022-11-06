@@ -763,12 +763,12 @@ public:
 	// }
 };
 
-class FuncCallAST : public ASTnode {
-	std::string FuncName; 
+class FuncCallAST : public ExprAST {
+	TOKEN FuncName; 
 	std::vector<std::unique_ptr<ExprAST>> Args; 
 
 public:
-	FuncCallAST(const std::string &FuncName, std::vector<std::unique_ptr<ExprAST>> Args)
+	FuncCallAST(TOKEN FuncName, std::vector<std::unique_ptr<ExprAST>> Args)
 		: FuncName(FuncName), Args(std::move(Args)) {}
 
 	// virtual std::string to_string() const override{
@@ -781,11 +781,11 @@ public:
 
 /// =================================== !! Variable's START !! ================================================ ///
 #pragma region
-class Variable : public ASTnode {
-	std::string Ident; 
+class Variable : public ExprAST {
+	TOKEN Ident; 
 
 public: 
-	Variable(const std::string &Ident)
+	Variable(TOKEN Ident)
 		: Ident(Ident){}
 	
 	// virtual std::string to_string() const override{
@@ -805,7 +805,7 @@ public:
 	// 	return VarStr(Type) + " " + Name;
 	// };
 };
-class VariableAssignment : public ASTnode {
+class VariableAssignment : public ExprAST {
 	std::string Ident; 
 	std::unique_ptr<ExprAST> Expr; 
 
@@ -823,8 +823,25 @@ public:
 
 /// =================================== !! Block & Stmts Start !! ================================================ ///
 #pragma region
+// class StmtAST : public ASTnode{
+// 	std::unique_ptr<ExprAST> Expr;
+// 	std::unique_ptr<IfAST> If;
+// 	std::unique_ptr<WhileAST> While;
+// 	std::unique_ptr<ReturnAST> Return;
+// 	std::unique_ptr<BlockAST> Block; 
 
-class BlockAST : public ASTnode{
+// public:
+// 	StmtAST(std::unique_ptr<ExprAST> Expr, std::unique_ptr<IfAST> If, std::unique_ptr<WhileAST> While, std::unique_ptr<ExprAST> Return, std::unique_ptr<BlockAST> Block)
+// 		: Expr(std::move(Expr)), If(std::move(If)), While(std::move(While)), Return(std::move(Return)), Block(std::move(Block)) {}
+	
+// 	// virtual std::string to_string() const override{
+// 	// 	return "fk";
+// 	// };
+// };
+
+class StmtAST : public ASTnode {};
+
+class BlockAST : public StmtAST{
 	std::vector<std::unique_ptr<VariableDeclAST>> VarDecls; 
 	std::vector<std::unique_ptr<StmtAST>> StmtList;
 
@@ -836,43 +853,7 @@ public:
 	// 	return "fl";
 	// };
 };
-
-class StmtAST : public ASTnode{
-	std::unique_ptr<ExprAST> Expr;
-	std::unique_ptr<IfAST> If;
-	std::unique_ptr<WhileAST> While;
-	std::unique_ptr<ExprAST> Return;
-	std::unique_ptr<BlockAST> Block; 
-
-public:
-	StmtAST(std::unique_ptr<ExprAST> Expr, std::unique_ptr<IfAST> If, std::unique_ptr<WhileAST> While, std::unique_ptr<ExprAST> Return, std::unique_ptr<BlockAST> Block)
-		: Expr(std::move(Expr)), If(std::move(If)), While(std::move(While)), Return(std::move(Return)), Block(std::move(Block)) {}
-	
-	// virtual std::string to_string() const override{
-	// 	return "fk";
-	// };
-};
-
-#pragma endregion
-/// =================================== !! Block & Stmt End !! ================================================ ///
-
-/// =================================== !! If & While & Expr AST Start !! ================================================ ///
-#pragma region
-class ExprAST : public ASTnode{
-	std::unique_ptr<VariableAssignment> VarAss; 
-	std::unique_ptr<BinaryExprAST> BinaryExpr; 
-	std::unique_ptr<UnaryExprAST> UnaryExpr;
-
-public:
-	ExprAST(std::unique_ptr<VariableAssignment> VarAss, std::unique_ptr<BinaryExprAST> BinaryExpr, std::unique_ptr<UnaryExprAST> UnaryExpr)
-		: VarAss(std::move(VarAss)), BinaryExpr(std::move(BinaryExpr)), UnaryExpr(std::move(UnaryExpr)) {}
-	
-	// virtual std::string to_string() const override{
-	// 	return "Fix this";
-	// };
-};
-
-class IfAST : public ASTnode{
+class IfAST : public StmtAST{
 	std::unique_ptr<ExprAST> ConditionExpr;
 	std::unique_ptr<BlockAST> TrueBlock; 
 	std::unique_ptr<BlockAST> ElseBlock; 
@@ -884,45 +865,72 @@ public:
 	// 	return "IF ( )" + "-finish this later";
  	// };
 };
-class WhileAST : public ASTnode{
+class WhileAST : public StmtAST{
 	std::unique_ptr<ExprAST> ConditionExpr;
-	std::unique_ptr<BlockAST> LoopBlock; 
+	std::unique_ptr<StmtAST> LoopBlock; 
 
 public: 
-	WhileAST(std::unique_ptr<ExprAST> ConditionExpr, std::unique_ptr<BlockAST> LoopBlock)
+	WhileAST(std::unique_ptr<ExprAST> ConditionExpr, std::unique_ptr<StmtAST> LoopBlock)
 		: ConditionExpr(std::move(ConditionExpr)), LoopBlock(std::move(LoopBlock)) {}
 	
 	// virtual std::string to_string() const override{
 	// 	return "WHILE ( )" + "-finish this later";
 	// };
 };
+class ReturnAST : public StmtAST {
+	std::unique_ptr<ExprAST> ReturnExpr;
+
+public:
+	ReturnAST(std::unique_ptr<ExprAST> ReturnExpr)
+		: ReturnExpr(ReturnExpr) {}
+
+	// virtual std::string to_string() const override{
+	// 	return "RETURN ( )" + "-finish this later";
+	// };
+};
+
+class ExprAST : public StmtAST {}; 
+
+// 	std::unique_ptr<VariableAssignment> VarAss; 
+// 	std::unique_ptr<BinaryExprAST> BinaryExpr; 
+// 	std::unique_ptr<UnaryExprAST> UnaryExpr;
+
+// public:
+// 	ExprAST(std::unique_ptr<VariableAssignment> VarAss, std::unique_ptr<BinaryExprAST> BinaryExpr, std::unique_ptr<UnaryExprAST> UnaryExpr)
+// 		: VarAss(std::move(VarAss)), BinaryExpr(std::move(BinaryExpr)), UnaryExpr(std::move(UnaryExpr)) {}
+	
+// 	// virtual std::string to_string() const override{
+// 	// 	return "Fix this";
+// 	// };
+// };
+
 #pragma endregion
-/// =================================== !! If & While & Expr AST Start !! ================================================ ///
+/// =================================== !! Block & Stmts End !! ================================================ ///
 
 /// =================================== !! Binary / Unary AST Start !! ================================================ ///
 #pragma region
 /// BinaryExpAST - Class for variable names 
-class BinaryExprAST : public ASTnode {
-	char Op;
+class BinaryExprAST : public ExprAST {
+	TOKEN Op;
 	std::unique_ptr<ExprAST> LHS; 
 	std::unique_ptr<ExprAST> RHS; 
 
 public:
-	BinaryExprAST(char op, std::unique_ptr<ExprAST> LHS, std::unique_ptr<ExprAST> RHS) 
-		: Op(op), LHS(std::move(LHS)), RHS(std::move(RHS)) {}
+	BinaryExprAST(TOKEN Op, std::unique_ptr<ExprAST> LHS, std::unique_ptr<ExprAST> RHS) 
+		: Op(std::move(Op)), LHS(std::move(LHS)), RHS(std::move(RHS)) {}
 
 	// virtual std::string to_string() const override {
 	// 	return "need to implement";
 	// };
 };
 /// UnaryExpAST - Class for variable names 
-class UnaryExprAST : public ASTnode {
-	char Op;
+class UnaryExprAST : public ExprAST {
+	TOKEN Op;
 	std::unique_ptr<ExprAST> Expr; 
 
 public:
-	UnaryExprAST(char op, std::unique_ptr<ExprAST> Expr) 
-		: Op(op), Expr(std::move(Expr)) {}
+	UnaryExprAST(TOKEN Op, std::unique_ptr<ExprAST> Expr) 
+		: Op(std::move(Op)), Expr(std::move(Expr)) {}
 
 	// virtual std::string to_string() const override {
 	// 	return "need to fix";
@@ -934,42 +942,44 @@ public:
 /// =================================== !! Literal AST Start !! ================================================ ///
 #pragma region
 //IntegerAST - Class for numeric literals like 1, 2, 10, 10
-class IntegerAST : public ASTnode {
-	int Val;
+class IntegerAST : public ExprAST {
+	TOKEN Val;
 
 public:
 	IntegerAST(int Val) 
 		: Val(Val){}
 
 	virtual string to_string() const override {
-		return std::to_string(Val);
+		return Val.lexeme;
 	};
 };
 /// FloatAST - Class for float literals like 1.3 2.1
-class FloatAST : public ASTnode {
-	float Val;
+class FloatAST : public ExprAST {
+	TOKEN Val;
 
 public:
 	FloatAST(float Val) 
 		: Val(Val){}
 
 	virtual string to_string() const override {
-		return std::to_string(Val);
+		return Val.lexeme;
 	};
 };
 
 /// Bool - Class for bool literals like True, False
-class BoolAST : public ASTnode {
-	bool Val;
+class BoolAST : public ExprAST {
+	TOKEN Val;
 
 public:
 	BoolAST(bool Val) 
 		: Val(Val){}
 
 	virtual string to_string() const override {
-		return std::to_string(Val);
+		return Val.lexeme;
 	};
 };
+
+class VoidAST : public ExprAST {}
 
 #pragma endregion
 // =================================== !! Literal AST End !! ================================================ ///
@@ -998,6 +1008,24 @@ static void Match(TOKEN_TYPE expectedTokenType, string errMessage, const char * 
 	cout << "[FOR TESTING] : Production Rule: " << prodRule << endl << "Matched: " << CurTok.lexeme << endl << endl; 
 	getNextToken();
 }
+
+static bool PresedenceLayer(int type){
+	bool addlayer; 
+	switch(type){
+		case BOOL_LIT:
+		case FLOAT_LIT:
+		case INT_LIT:
+		case LPAR:
+		case NOT:
+		case MINUS:
+		case IDENT:
+			addlayer = true;
+		default:
+			addlayer = false;
+	}
+	return addlayer;
+}
+
 // ----- Helper Functions End ------ // 
 
 static void Expr();
@@ -1006,14 +1034,15 @@ static void Stmt();
 static void Var_Type();
 static void Type_Spec();
 
-static void Arg_List_Prime(){
-	// cout << "Arg_List_Prime" << endl;
+static void Arg_List_Prime(std::vector<std::unique_ptr<ExprAST>> &args){
 	switch (CurTok.type)
 	{
 		case COMMA:
-			Match(COMMA, "COMMA");
-			Expr();
-			Arg_List_Prime();
+			Match(COMMA, "Expected ',' after argument");
+			auto e = Expr();
+			args.push_back(e);
+
+			Arg_List_Prime(args);
 			break;
 		case RPAR:
 			break;
@@ -1022,8 +1051,8 @@ static void Arg_List_Prime(){
 	}
 }
 
-static void Arg_List(){
-	// cout << "Arg_List" << endl;
+static std::vector<std::unique_ptr<ExprAST>> Arg_List(){
+	std::vector<std::unique_ptr<ExprAST>> args;
 	switch (CurTok.type)
 	{
 		case BOOL_LIT:
@@ -1033,16 +1062,21 @@ static void Arg_List(){
 		case IDENT:
 		case NOT:
 		case MINUS:
-			Expr();
-			Arg_List_Prime();
+			auto e = Expr();
+			args.push_back(e);
+
+
+			Arg_List_Prime(args);
 			break; 	
 		default:
 			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS}");
 	}
+	return args; 
 }
 
-static void Args(){
-	// cout << "Args" << endl;
+static std::vector<std::unique_ptr<ExprAST>> Args(){
+	std::vector<std::unique_ptr<ExprAST>> args;
+
 	switch (CurTok.type)
 	{
 		case BOOL_LIT:
@@ -1052,35 +1086,48 @@ static void Args(){
 		case IDENT:
 		case NOT:
 		case MINUS:
-			Arg_List();
+			args = Arg_List();
 			break;
 		case RPAR:
 			break;
 		default:
 			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS, RPAR}");
 	}
+	return args;
 }
 
 
-static void Rval_Term(){
-	// cout << "Rval_Term" << endl;
+static std::unique_ptr<ExprAST> Rval_Term(){
+	std::unique_ptr<ExprAST> expr; 
+	TOKEN lit_tok; 
 	switch (CurTok.type)
 	{
 		case BOOL_LIT:
-			Match(BOOL_LIT, "BOOL_LIT");
+			lit_tok = CurTok;
+			Match(BOOL_LIT, "Expected bool literal. ");
+			
+			expr = std::make_unique<BoolAST>(lit_tok);
 			break;
 		case FLOAT_LIT:
-			Match(FLOAT_LIT, "FLOAT_LIT");
+			lit_tok = CurTok; 
+			Match(FLOAT_LIT, "Expected float literal. ");
+
+			expr = std::make_unique<FloatAST>(lit_tok);
 			break;
 		case INT_LIT:
-			Match(INT_LIT, "INT_LIT");
+			lit_tok = CurTok; 
+			Match(INT_LIT, "Expected int literal. ");
+
+			expr = std::make_unique<IntegerAST>(lit_tok);
 			break;
 		default:
 			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT}");
 	}
+	return expr; 
 }
-static void Rval_Ident_Prime(){
-	// cout << "Rval_Ident_Prime" << endl;
+static std::vector<std::unique_ptr<ExprAST>> Rval_Ident_Prime(){
+	std::vector<std::unique_ptr<ExprAST>> args; 
+
 	switch (CurTok.type)
 	{	
 		case COMMA:
@@ -1101,54 +1148,72 @@ static void Rval_Ident_Prime(){
 		case MINUS:
 			break;
 		case LPAR:
-			Match(LPAR, "LPAR");
-			Args();
-			Match(RPAR, "RPAR");
+			Match(LPAR, "Expected '(' before function call. ");
+			args = Args();
+			Match(RPAR, "Expected ')' after function call. ");
 			break;
 		default:
 			throw ParseException("Invalid Token Error: \nExpected: {COMMA, LPAR, RPAR, SC, OR, AND, EQ, NE, LT, GT, LE, GE, PLUS, MOD, DIV, ASTERIX}");
 	}
+	return args;
 }
-static void Rval_Ident(){
+static std::unique_ptr<ExprAST> Rval_Ident(){
+	TOKEN ident; 
+	std::unique_ptr<ExprAST> expr; 
 	// cout << "Rval_Ident" << endl;
 	switch (CurTok.type)
 	{
 		case BOOL_LIT:
 		case FLOAT_LIT:
 		case INT_LIT:
-			Rval_Term();
+			expr = Rval_Term();
 			break;
 		case IDENT:
-			Match(IDENT, "IDENT");
-			Rval_Ident_Prime();
+			ident = CurTok;
+			Match(IDENT, "Expected identifer. ");
+			auto args = Rval_Ident_Prime();
+			
+			// Since identifer could be function call or variable 
+			// We must identify first if it is a function call or variable 
+			// Then create the correct node depending on which
+			if (args.size() == 0){
+				expr = std::make_unique<Variable>(ident);
+			} else{
+				expr = std::make_unique<FuncCallAST>(ident, args);
+			}
 			break;
 		default:
 			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, IDENT}");
 	}
+	return expr; 
 }
 
-static void Rval_Par(){
+static std::unique_ptr<ExprAST> Rval_Par(){
 	// cout << "Rval_Par" << endl;
+	std::unique_ptr<ExprAST> expr; 
 	switch (CurTok.type)
 	{
 		case BOOL_LIT:
 		case FLOAT_LIT:
 		case INT_LIT:
 		case IDENT:
-			Rval_Ident();
+			expr = Rval_Ident();
 			break;
 		case LPAR:
-			Match(LPAR, "LPAR");
-			Expr();
-			Match(RPAR, "RPAR");
+			Match(LPAR, "Expected '(' before expression. ");
+			expr = Expr();
+			Match(RPAR, "Expected ')' after expression. ");
 			break;
 		default:
 			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT}");
 	}
+	return expr; 
 }
 
-static void Rval_Neg(){
-	// cout << "Rval_Neg" << endl;
+static std::unique_ptr<ExprAST> Rval_Neg(){
+	std::unique_ptr<ExprAST> expr;
+	TOKEN op_token; 
+
 	switch (CurTok.type)
 	{
 		case BOOL_LIT:
@@ -1156,22 +1221,37 @@ static void Rval_Neg(){
 		case INT_LIT:
 		case LPAR:
 		case IDENT:
-			Rval_Par();
+			expr = Rval_Par();
 			break;
 		case NOT:
-			Match(NOT, "NOT");
-			Rval_Neg();
+			op_token = CurTok;
+			Match(NOT, "Expected '!' operator. ");
+
+			auto e = Rval_Neg();
+
+			expr = std::make_unique<UnaryExprAST>(op_token, e);
 			break;
 		case MINUS:
-			Match(MINUS, "MINUS");
-			Rval_Neg();
+			op_token = CurTok; 
+			Match(MINUS, "Expected '-' operator. ");
+
+			auto e = Rval_Neg();
+
+			expr = std::make_unique<UnaryExprAST>(op_token, e);
 			break;
 		default:
 			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS}");
 	}
+	return expr; 
 }
-static void Rval_Mul_Prime(){
+
+static std::unique_ptr<ExprAST> Rval_Mul_Prime(std::unique_ptr<ExprAST> LHS){
 	// cout << "Rval_Mul_Prime" << endl;
+	std::unique_ptr<ExprAST> LHS_Prime; 
+	std::unique_ptr<ExprAST> RHS; 
+	std::unique_ptr<ExprAST> expr;
+	TOKEN op_token;
+
 	switch (CurTok.type)
 	{
 		case COMMA:
@@ -1189,44 +1269,58 @@ static void Rval_Mul_Prime(){
 		case MINUS:
 			break;
 		case MOD:
-			Match(MOD, "MOD");
-			Rval_Neg();
-			Rval_Mul_Prime();
+			op_token = CurTok;
+			Match(MOD, "Expected '%' operator. ");
+
+			LHS_Prime = Rval_Neg();
+			RHS = Rval_Mul_Prime(LHS);
+
+			expr = std::make_unique<BinaryExprAST>(op_token, LHS_Prime, RHS);
 			break;
 		case DIV:
-			Match(DIV, "DIV");
-			Rval_Neg();
-			Rval_Mul_Prime();
+			op_token = CurTok;
+			Match(DIV, "Expected '/' operator. ");
+
+			LHS_Prime = Rval_Neg();
+			RHS = Rval_Mul_Prime(LHS);
+
+			expr = std::make_unique<BinaryExprAST>(op_token, LHS_Prime, RHS);
 			break;
 		case ASTERIX:
-			Match(ASTERIX, "ASTERIX");
-			Rval_Neg();
-			Rval_Mul_Prime();
+			op_token = CurTok;
+			Match(ASTERIX, "Expected '*' operator. ");
+
+			LHS_Prime = Rval_Neg();
+			RHS = Rval_Mul_Prime(LHS);
+
+			expr = std::make_unique<BinaryExprAST>(op_token, LHS_Prime, RHS);
 			break;
 		default:
 			throw ParseException("Invalid Token Error: \nExpected: {COMMA, RPAR, SC, OR, AND, EQ, NE, LT, GT, LE, GE, PLUS, MINUS, MOD, DIV, ASTERIX}");
 	}
+	return expr;
 }
-static void Rval_Mul(){
-	// cout << "Rval_Mul" << endl;
-	switch (CurTok.type)
-	{
-		case BOOL_LIT:
-		case FLOAT_LIT:
-		case INT_LIT:
-		case LPAR:
-		case NOT:
-		case MINUS:
-		case IDENT:
-			Rval_Neg();
-			Rval_Mul_Prime();
-			break;
-		default:
-			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS}");
+static std::unique_ptr<ExprAST> Rval_Mul(){
+	std::unique_ptr<ExprAST> LHS; 
+	std::unique_ptr<ExprAST> expr;
+
+	if (PresedenceLayer(CurTok.type)){
+		LHS = Rval_Neg();
+		expr = Rval_Mul_Prime(LHS);
+	} else{
+		throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS}");
 	}
+
+	return expr; 
 }
-static void Rval_Add_Prime(){
+
+static std::unique_ptr<ExprAST> Rval_Add_Prime(std::unique_ptr<ExprAST> LHS){
 	// cout << "Rval_Add_Prime" << endl;
+	std::unique_ptr<ExprAST> LHS_Prime; 
+	std::unique_ptr<ExprAST> RHS; 
+	std::unique_ptr<ExprAST> expr;
+	TOKEN op_token;
+
 	switch (CurTok.type)
 	{
 		case COMMA:
@@ -1242,39 +1336,47 @@ static void Rval_Add_Prime(){
 		case GE:
 			break;
 		case PLUS:
-			Match(PLUS, "PLUS");
-			Rval_Mul();
-			Rval_Add_Prime();
+			op_token = CurTok;
+			Match(PLUS, "Expected '+' operator. ");
+
+			LHS_Prime = Rval_Mul();
+			RHS = Rval_Add_Prime(LHS);
+
+			expr = std::make_unique<BinaryExprAST>(op_token, LHS_Prime, RHS);
 			break;
 		case MINUS:
-			Match(MINUS, "MINUS");
-			Rval_Mul();
-			Rval_Add_Prime();
+			op_token = CurTok;
+			Match(MINUS, "Expected '-' operator. ");
+
+			LHS_Prime = Rval_Mul();
+			RHS = Rval_Add_Prime(LHS);
+
+			expr = std::make_unique<BinaryExprAST>(op_token, LHS_Prime, RHS);
 			break;
 		default:
 			throw ParseException("Invalid Token Error: \nExpected: {COMMA, RPAR, SC, OR, AND, EQ, NE, LT, GT, LE, GE, PLUS, MINUS}");
 	}
+	return expr; 
 }
-static void Rval_Add(){
-	// cout << "Rval_Add" << endl;
-	switch (CurTok.type)
-	{
-		case BOOL_LIT:
-		case FLOAT_LIT:
-		case INT_LIT:
-		case LPAR:
-		case NOT:
-		case MINUS:
-		case IDENT:
-			Rval_Mul();
-			Rval_Add_Prime();
-			break;
-		default:
-			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS}");
+static std::unique_ptr<ExprAST> Rval_Add(){
+	std::unique_ptr<ExprAST> LHS; 
+	std::unique_ptr<ExprAST> expr;
+
+	if (PresedenceLayer(CurTok.type)){
+		LHS = Rval_Mul();
+		expr = Rval_Add_Prime(LHS)
+	} else{
+		throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS}");
 	}
+	return expr; 
 }
-static void Rval_Cmp_Prime(){
-	// cout << "Rval_Cmp_Prime" << endl;
+
+static std::unique_ptr<ExprAST> Rval_Cmp_Prime(std::unique_ptr<ExprAST> LHS){
+	std::unique_ptr<ExprAST> LHS_Prime; 
+	std::unique_ptr<ExprAST> RHS; 
+	std::unique_ptr<ExprAST> expr;
+	TOKEN op_token; 
+
 	switch (CurTok.type)
 	{
 		case COMMA:
@@ -1286,49 +1388,65 @@ static void Rval_Cmp_Prime(){
 		case NE:
 			break;
 		case LT:
-			Match(LT, "LT");
-			Rval_Add();
-			Rval_Cmp_Prime();
+			op_token = CurTok;
+			Match(LT, "Expected '<' operator. ");
+
+			LHS_Prime = Rval_Add();
+			RHS = Rval_Cmp_Prime(LHS);
+
+			expr = std::make_unique<BinaryExprAST>(op_token, LHS_Prime, RHS);
 			break;
 		case GT:
-			Match(GT, "GT");
-			Rval_Add();
-			Rval_Cmp_Prime();
+			op_token = CurTok;
+			Match(GT, "Expected '>' operator. ");
+
+			LHS_Prime = Rval_Add();
+			RHS = Rval_Cmp_Prime(LHS);
+
+			expr = std::make_unique<BinaryExprAST>(op_token, LHS_Prime, RHS);
 			break;
 		case LE:
-			Match(LE, "LE");
-			Rval_Add();
-			Rval_Cmp_Prime();
+			op_token = CurTok;
+			Match(LE, "Expected '<=' operator. ");
+
+			LHS_Prime = Rval_Add();
+			RHS = Rval_Cmp_Prime(LHS);
+
+			expr = std::make_unique<BinaryExprAST>(op_token, LHS_Prime, RHS);
 			break;
 		case GE:
-			Match(GE, "GE");
-			Rval_Add();
-			Rval_Cmp_Prime();
+			op_token = CurTok;
+			Match(GE, "Exepcted '>=' operator. ");
+
+			LHS_Prime = Rval_Add();
+			RHS = Rval_Cmp_Prime(LHS);
+
+			expr = std::make_unique<BinaryExprAST>(op_token, LHS_Prime, RHS);
 			break;
 		default:
 			throw ParseException("Invalid Token Error: \nExpected: {COMMA, RPAR, SC, OR, AND, EQ, NE, LT, GT, LE, GE}");
 	}
+	return expr; 
 }
 static void Rval_Cmp(){
-	// cout << "Rval_Cmp" << endl;
-	switch (CurTok.type)
-	{
-		case BOOL_LIT:
-		case FLOAT_LIT:
-		case INT_LIT:
-		case LPAR:
-		case NOT:
-		case MINUS:
-		case IDENT:
-			Rval_Add();
-			Rval_Cmp_Prime();
-			break;
-		default:
-			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS}");
+	std::unique_ptr<ExprAST> LHS; 
+	std::unique_ptr<ExprAST> expr;
+
+	if (PresedenceLayer(CurTok.type)){
+		LHS = Rval_Add();
+		expr = Rval_Cmp_Prime(LHS);
+	} else{
+		throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS}");
 	}
+	return expr; 
 }
-static void Rval_Eq_Prime(){
-	// cout << "Rval_Eq_Prime" << endl;
+
+static std::unique_ptr<ExprAST> Rval_Eq_Prime(std::unique_ptr<ExprAST> LHS){
+	std::unique_ptr<ExprAST> LHS_Prime; 
+	std::unique_ptr<ExprAST> RHS; 
+	std::unique_ptr<ExprAST> expr; 
+	TOKEN op_token; 
+
 	switch (CurTok.type)
 	{
 		case COMMA:
@@ -1338,39 +1456,48 @@ static void Rval_Eq_Prime(){
 		case AND:
 			break;
 		case EQ:
-			Match(EQ, "EQ");
-			Rval_Cmp();
-			Rval_Eq_Prime();
+			op_token = CurTok; 
+			Match(EQ, "Expected '==' operator. ");
+
+			LHS_Prime = Rval_Cmp();
+			RHS = Rval_Eq_Prime(LHS);
+
+			expr = std::make_unique<BinaryExprAST>(op_token, LHS_Prime, RHS);
 			break;
 		case NE:
-			Match(NE, "NE");
-			Rval_Cmp();
-			Rval_Eq_Prime();
+			op_token = CurTok;
+			Match(NE, "Expected '!=' operator. ");
+
+			LHS_Prime = Rval_Cmp();
+			RHS = Rval_Eq_Prime(LHS);
+			
+			expr = std::make_unique<BinaryExprAST>(op_token, LHS_Prime, RHS);
 			break;
 		default:
 			throw ParseException("Invalid Token Error: \nExpected: {COMMA, RPAR, SC, OR, AND, EQ, NE}");
 	}
+
+	return expr; 
 }
-static void Rval_Eq(){
-	// cout << "Rval_Eq" << endl;
-	switch (CurTok.type)
-	{
-		case BOOL_LIT:
-		case FLOAT_LIT:
-		case INT_LIT:
-		case LPAR:
-		case NOT:
-		case MINUS:
-		case IDENT:
-			Rval_Cmp();
-			Rval_Eq_Prime();
-			break;
-		default:
-			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS}");
+static std::unique_ptr<ExprAST> Rval_Eq(){
+	std::unique_ptr<ExprAST> LHS; 
+	std::unique_ptr<ExprAST> expr; 
+
+	if (PresedenceLayer(CurTok.type)){
+		LHS = Rval_Cmp();
+		expr = Rval_Eq_Prime(LHS);
+	} else{
+		throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS}");
 	}
+
+	return expr; 
 }
-static void Rval_And_Prime(){
-	// cout << "Rval_And_Prime" << endl;
+
+static std::unique_ptr<ExprAST> Rval_And_Prime(std::unique_ptr<ExprAST> LHS){
+	std::unique_ptr<ExprAST> LHS_Prime; 
+	std::unique_ptr<ExprAST> RHS; 
+	std::unique_ptr<ExprAST> expr; 
+
 	switch (CurTok.type)
 	{
 		case COMMA:
@@ -1379,36 +1506,42 @@ static void Rval_And_Prime(){
 		case OR:
 			break;
 		case AND:
-			Match(AND, "AND");
-			Rval_Eq();
-			Rval_And_Prime();
+			TOKEN op_token = CurTok;
+			Match(AND, "Expected '&&' operator. ");
+
+			LHS_Prime = Rval_Eq();
+			RHS = Rval_And_Prime(LHS);
+
+			expr = std::make_unique<BinaryExprAST>(op_token, LHS_Prime, RHS);
 			break;
 		default:
 			throw ParseException("Invalid Token Error: \nExpected: {COMMA, RPAR, SC, OR, AND}");
 	}
+	return expr 
 }
-static void Rval_And(){
-	// cout << "Rval_And" << endl;
-	switch (CurTok.type)
-	{
-		case BOOL_LIT:
-		case FLOAT_LIT:
-		case INT_LIT:
-		case LPAR:
-		case NOT:
-		case MINUS:
-		case IDENT:
-			Rval_Eq();
-			Rval_And_Prime();
-			break;
-		default:
-			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS}");
+
+static std::unique_ptr<ExprAST> Rval_And(){
+	std::unique_ptr<ExprAST> LHS; 
+	std::unique_ptr<ExprAST> expr; 
+
+	if (PresedenceLayer(CurTok.type)){
+		LHS = Rval_Eq();
+		expr = Rval_And_Prime(LHS);
+	} else{
+		throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS}");
 	}
+
+	return expr; 
 }
 
 
-static void Rval_Or_Prime(){
+// rval_or_prime ::= "||" rval_and rval_or_prime | epsilon
+static std::unique_ptr<ExprAST> Rval_Or_Prime(std::unique_ptr<ExprAST> LHS){
 	// cout << "Rval_Or_Prime" << endl;
+	std::unique_ptr<ExprAST> LHS_Prime; 
+	std::unique_ptr<ExprAST> RHS; 
+	std::unique_ptr<ExprAST> expr; 
+
 	switch (CurTok.type)
 	{
 		case COMMA:
@@ -1416,36 +1549,42 @@ static void Rval_Or_Prime(){
 		case SC:
 			break;
 		case OR:
-			Match(OR, "OR");
-			Rval_And();
-			Rval_Or_Prime();
+			TOKEN op_token = CurTok; 
+			Match(OR, "Expected '||' operator. ");
+
+			LHS_Prime = Rval_And();
+			RHS = Rval_Or_Prime(LHS);
+
+			expr = std::make_unique<BinaryExprAST>(op_token, LHS_Prime, RHS);
 			break;
 		default:
 			throw ParseException("Invalid Token Error: \nExpected: {COMMA, RPAR, SC, OR}");
 	}
+
+	return expr; 
 }
 
-static void Rval_Or(){
-	// cout << "Rval_Or" << endl;
-	switch (CurTok.type)
-	{
-		case BOOL_LIT:
-		case FLOAT_LIT:
-		case INT_LIT:
-		case LPAR:
-		case NOT:
-		case MINUS:
-		case IDENT:
-			Rval_And();
-			Rval_Or_Prime();
-			break;
-		default:
-			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS}");
+
+// rval_or ::= rval_and rval_or_prime 
+static std::unique_ptr<ExprAST> Rval_Or(){
+	std::unique_ptr<ExprAST> LHS; 
+	std::unique_ptr<ExprAST> expr; 
+
+	if (PresedenceLayer(CurTok.type)){
+		LHS = Rval_And();
+		expr = Rval_Or_Prime(LHS);
+	} else{
+		throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS}");
 	}
+
+	return expr;
 }
 
-static void Expr(){
+// expr ::= IDENT "=" expr | rval_or
+static std::unique_ptr<ExprAST> Expr(){
 	// cout << "Expr" << endl;
+	std::unique_ptr<ExprAST> expr; 
+	
 	switch (CurTok.type)
 	{
 		case BOOL_LIT:
@@ -1454,7 +1593,7 @@ static void Expr(){
 		case LPAR:
 		case NOT:
 		case MINUS:
-			Rval_Or();
+			expr = Rval_Or();
 			break;
 		// Non LL(1) production 
 		// Must use extra look-ahead 
@@ -1467,13 +1606,19 @@ static void Expr(){
 			CurTok = tmpToken; 
 
 			if (nextToken.type == ASSIGN){
-				Match(IDENT, "IDENT");
-				Match(ASSIGN, "ASSIGN");
-				Expr();
-			} else{
-				Rval_Or();
-			}
 
+				TOKEN prev_token = CurTok; 
+				Match(IDENT, "Expected identifer. ");
+				std::string ident = prev_token.lexeme; 
+
+				Match(ASSIGN, "Expected '=' after variable identifer. ");
+				auto var_expr = Expr();
+
+				expr = std::make_unique<VariableAssignment>(ident, var_expr);
+
+			} else{
+				expr = Rval_Or();
+			}
 			break;
 		}
 		case SC:
@@ -1482,10 +1627,12 @@ static void Expr(){
 		default:
 			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS, SC}");
 	}
+	return expr; 
 }
 
-static void Return_Stmt_Prime(){
-	// cout << "Return_Stmt_Prime" << endl;
+// return_stmt_prime ::= ";" | expr ";"   
+static std::unique_ptr<ReturnAST> Return_Stmt_Prime(){
+	std::unique_ptr<ExprAST> expr; 
 	switch (CurTok.type)
 	{
 		case BOOL_LIT:
@@ -1495,41 +1642,49 @@ static void Return_Stmt_Prime(){
 		case IDENT:
 		case NOT:
 		case MINUS:
-			Expr();
-			Match(SC, "SC");
+			expr = Expr();
+			Match(SC, "Expected ';' after return expression. ");
 			break;
 		case SC:
-			Match(SC, "SC");
+			Match(SC, "Expected ';' after return keyword. ");
 			break;
 		default:
 			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS, SC}");
 	}
+	
+	return std::make_unique<ReturnAST>(expr);
 }
 
-static void Return_Stmt(){
-	// cout << "Return_Stmt" << endl;
+// return_stmt ::= "return" return_stmt_prime 
+static std::unique_ptr<ReturnAST> Return_Stmt(){
+	std::unique_ptr<ReturnAST> return_stmt;
+
 	switch (CurTok.type)
 	{
 		case RETURN:
-			Match(RETURN, "RETURN");
-			Return_Stmt_Prime();
+			Match(RETURN, "Expected 'return' keyword. ");
+			return_stmt = Return_Stmt_Prime();
 			break;
 		default:
 			throw ParseException("Invalid Token Error: \nExpected: {RETURN}");
 	}
+
+	return return_stmt;
 }
 
-static void Else_Stmt(){
-	// cout << "Else_Stmt" << endl;
+// else_stmt  ::= "else" block | epsilon
+static std::unique_ptr<BlockAST> Else_Stmt(){
+	std::unique_ptr<BlockAST> else_block; 
+
 	switch (CurTok.type)
 	{
 		case BOOL_LIT:
 		case FLOAT_LIT:
 		case INT_LIT:
 		case LPAR:
-		case IDENT:
 		case NOT:
 		case MINUS:
+		case IDENT:
 		case SC:
 		case RETURN:
 		case IF:
@@ -1538,49 +1693,70 @@ static void Else_Stmt(){
 		case RBRA:
 			break;
 		case ELSE:
-			Match(ELSE, "ELSE");
-			Block();
+			Match(ELSE, "Expected 'else' keyword after if statement. ");
+			else_block = Block();
 			break;
 		default:
 			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS, SC, RETURN, IF, WHILE, RBRA, LBRA, ELSE}");
 	}
+
+	return else_block;
 }
 
-static void If_Stmt(){
-	// cout << "If_Stmt" << endl;
+// if_stmt ::= "if" "(" expr ")" block else_stmt
+static std::unique_ptr<IfAST> If_Stmt(){
+	std::unique_ptr<ExprAST> condition_expr; 
+	std::unique_ptr<BlockAST> true_block; 
+	std::unique_ptr<BlockAST> else_block; 
+
 	switch (CurTok.type)
 	{
 		case IF:
-			Match(IF, "IF");
-			Match(LPAR, "LPAR");
-			Expr();
-			Match(RPAR, "RPAR");
-			Block();
-			Else_Stmt();
+			Match(IF, "Expected 'if' keyword. ");
+			Match(LPAR, "Expected '(' before if condition. ");
+
+			condition_expr = Expr();
+
+			Match(RPAR, "Expected ')' after if condition. ");
+
+			true_block = Block();
+			else_block = Else_Stmt();
 			break;
 		default:
 			throw ParseException("Invalid Token Error: \nExpected: {IF}");
 	}
+
+	return std::make_unique<IfAST>(condition_expr, true_block, else_block); 
 }
 
-static void While_Stmt(){
+// while_stmt ::= "while" "(" expr ")" stmt 
+static std::unique_ptr<WhileAST> While_Stmt(){
 	// cout << "While_Stmt" << endl;
+	std::unique_ptr<ExprAST> condition_expr; 
+	std::unique_ptr<StmtAST> loop_block; 
 	switch (CurTok.type)
 	{
 		case WHILE:
-			Match(WHILE, "WHILE");
-			Match(LPAR, "LPAR");
-			Expr();
-			Match(RPAR, "RPAR");
-			Stmt();
+			Match(WHILE, "Expected 'While' keyword. ");
+			Match(LPAR, "Expected '(' before loop condition. ");
+
+			condition_expr = Expr();
+
+			Match(RPAR, "Expected ')' after loop condition. ");
+
+			loop_block = Stmt();
 			break;
 		default:
 			throw ParseException("Invalid Token Error: \nExpected: {WHILE}");
 	}
+
+	return std::make_unique<WhileAST>(condition_expr, loop_block);
 }
 
-static void Expr_Stmt(){
+// expr_stmt ::= expr ";" | ";"
+static std::unique_ptr<ExprAST> Expr_Stmt(){
 	// cout << "Expr_Stmt" << endl;
+	std::unique_ptr<ExprAST> expr; 
 	switch (CurTok.type)
 	{
 		case BOOL_LIT:
@@ -1590,19 +1766,23 @@ static void Expr_Stmt(){
 		case IDENT:
 		case NOT:
 		case MINUS:
-			Expr();
-			Match(SC, "SC");
+			expr = Expr();
+			Match(SC, "Expected ';' after expression. ");
 			break;
 		case SC:
-			Match(SC, "SC");
+			Match(SC, "Expected ';' after expression. ");
 			break;
 		default:
 			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS, SC}");
 	}
+	return expr;
 }
 
-static void Stmt(){
+// stmt ::= expr_stmt |  block |  if_stmt |  while_stmt |  return_stmt
+static std::unique_ptr<StmtAST> Stmt(){
 	// cout << "Stmt" << endl;
+	std::unique_ptr<StmtAST> stmt; 
+
 	switch (CurTok.type)
 	{
 		case BOOL_LIT:
@@ -1613,27 +1793,31 @@ static void Stmt(){
 		case NOT:
 		case MINUS:
 		case SC:
-			Expr_Stmt();
+			stmt = Expr_Stmt();
 			break;
 		case RETURN:	
-			Return_Stmt();
+			stmt = Return_Stmt();
 			break;
 		case IF:
-			If_Stmt();
+			stmt = If_Stmt();
 			break;
 		case WHILE:
-			While_Stmt();
+			stmt = While_Stmt();
 			break;
 		case LBRA:
-			Block();
+			stmt = Block();
 			break;
 		default:
 			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS, SC, RETURN, IF, WHILE, LBRA}");
 	}
+
+	return stmt;
 }
 
-static void Stmt_List(){
+// stmt_list ::= stmt stmt_list | epsilon 
+static void Stmt_List(std::vector<std::unique_ptr<ASTnode>> &stmt_list){
 	// cout << "Stmt_List" << endl;
+
 	switch (CurTok.type)
 	{
 		case BOOL_LIT:
@@ -1648,8 +1832,10 @@ static void Stmt_List(){
 		case IF:
 		case WHILE:
 		case LBRA:
-			Stmt();
-			Stmt_List();
+			auto stmt = Stmt();
+			stmt_list.push_back(stmt);
+
+			Stmt_List(stmt_list);
 			break;
 		case RBRA:
 			break;
@@ -1658,24 +1844,35 @@ static void Stmt_List(){
 	}
 }
 
-static void Local_Decl(){
+// local_decl ::= var_type IDENT ";"
+static std::unique_ptr<VariableDeclAST> Local_Decl(){
 	// cout << "Local_Decl" << endl;
+	VAR_TYPE type; 
+	std::string ident; 
+
 	switch (CurTok.type)
 	{
 		case BOOL_TOK:
 		case FLOAT_TOK:
 		case INT_TOK:
-			Var_Type();
-			Match(IDENT, "IDENT");
-			Match(SC, "SC");
+			type = Var_Type();
+
+			TOKEN prev_token = CurTok; 
+			Match(IDENT, "Expected identierfer after variable type. ");
+			ident = prev_token.lexeme; 
+
+			Match(SC, "Expeceted ';' after variable decleration. ");
 			break;
 		default:
 			throw ParseException("Invalid Token Error: \nExpected: {BOOL_TOK, FLOAT_TOK, INT_TOK}");
 	}
+
+	return std::make_unique<VariableDeclAST>(ident, type);
 }
 
-static void Local_Decls(){
-	// cout << "Local_Decls" << endl;
+// local_decls ::= local_decl local_decls | epsilon
+static void Local_Decls(std::vector<std::unique_ptr<VariableDeclAST>> &variable_decls){
+
 	switch (CurTok.type)
 	{
 		case BOOL_LIT:
@@ -1695,8 +1892,10 @@ static void Local_Decls(){
 		case BOOL_TOK:
 		case FLOAT_TOK:
 		case INT_TOK:
-			Local_Decl();
-			Local_Decls();
+			auto decl = Local_Decl();
+			variable_decls.push_back(decl);
+
+			Local_Decls(variable_decls);
 			break;
 		default:
 			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS, SC, RETURN, IF, WHILE, RBRA, LBRA, BOOL_TOK, FLOAT_TOK, INT_TOK}");
@@ -1707,13 +1906,15 @@ static void Local_Decls(){
 static std::unique_ptr<BlockAST> Block(){
 	// cout << "Block" << endl;
 	std::vector<std::unique_ptr<VariableDeclAST>> variable_decls;
-	std::vector<std::unique_ptr<StmtAST>> stmt_list; 
+	std::vector<std::unique_ptr<ASTnode>> stmt_list; 
 	switch (CurTok.type)
 	{
 		case LBRA:
 			Match(LBRA, "Expected '{' to declare new scope. ");
-			variable_decls = Local_Decls();
-			stmt_list = Stmt_List();
+
+			Local_Decls(variable_decls);
+			Stmt_List(stmt_list);
+
 			Match(RBRA, "Expected '}' after statement. ");
 			break;
 		default:

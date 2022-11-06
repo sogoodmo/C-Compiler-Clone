@@ -91,11 +91,7 @@ stmt_list ::= stmt stmt_list | epsilon
 
 FIRST: {"{","if","while","else",IDENT,"-", ";", "!","(",INT_LIT,FLOAT_LIT,BOOL_LIT}
 FOLLOW: {";","{","if","while","return",IDENT,"-","!","(",INT_LIT,FLOAT_LIT,BOOL_LIT,"}"}
-stmt ::= expr_stmt 
-            |  block 
-            |  if_stmt 
-            |  while_stmt 
-            |  return_stmt
+stmt ::= expr_stmt |  block |  if_stmt |  while_stmt |  return_stmt
 
 FIRST: {"-", "!","(",INT_LIT,FLOAT_LIT,BOOL_LIT,IDENT,";"}
 FOLLOW: {";","{","if","while","return",IDENT,"-","!","(",INT_LIT,FLOAT_LIT,BOOL_LIT,"}"}
@@ -132,8 +128,7 @@ return_stmt_prime ::= ";" | expr ";"
 
 FIRST: {"-","!","(",INT_LIT,FLOAT_LIT,BOOL_LIT,IDENT}
 FOLLOW: {";",")",","}
-expr ::= IDENT "=" expr 
-        | rval_or
+expr ::= IDENT "=" expr | rval_or
 
 FIRST: {"-","!","(",INT_LIT,FLOAT_LIT,BOOL_LIT,IDENT}
 FOLLOW: {";",")",","}

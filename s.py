@@ -1,6 +1,6 @@
-import sympy as sym
-x,y = sym.symbols('x,y')
-eq1 = sym.Eq(x+y,5)
-eq2 = sym.Eq(x**2+y**2,17)
-result = sym.solve([eq1,eq2],(x,y))
-print(result)
+def ans(faces):
+    fnc = lambda x, y: 2 if x + y == 7 else 1 
+    return min(sum(fnc(t, f) for f in faces if f != t) for t in range(1, 7))
+
+faces = [1, 2, 6, 3]
+print(ans(faces))
