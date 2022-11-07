@@ -1,147 +1,81 @@
-Production Rule: Extern
-Matched EXTERN: extern
+[FOR TESTING] : Production Rule: Extern
+Matched: extern
 
-Production Rule: Var_Type
-Matched FLOAT_TOK: float
+[FOR TESTING] : Production Rule: Var_Type
+Matched: float
 
-Production Rule: Extern
-Matched IDENT: print_int
+[FOR TESTING] : Production Rule: GetIdentAndMatch
+Matched: print_int
 
-Production Rule: Extern
-Matched LPAR: (
+[FOR TESTING] : Production Rule: Extern
+Matched: (
 
-Production Rule: Var_Type
-Matched FLOAT_TOK: float
+[FOR TESTING] : Production Rule: Var_Type
+Matched: float
 
-Production Rule: Param
-Matched IDENT: X
+[FOR TESTING] : Production Rule: GetIdentAndMatch
+Matched: X
 
-Production Rule: Extern
-Matched RPAR: )
+[FOR TESTING] : Production Rule: Extern
+Matched: )
 
-Production Rule: Extern
-Matched SC: ;
+[FOR TESTING] : Production Rule: Extern
+Matched: ;
 
-Production Rule: Var_Type
-Matched FLOAT_TOK: float
+[FOR TESTING] : Production Rule: Var_Type
+Matched: float
 
-Production Rule: Decl
-Matched IDENT: addition
+[FOR TESTING] : Production Rule: GetIdentAndMatch
+Matched: addition
 
-Production Rule: Decl_Prime
-Matched LPAR: (
+[FOR TESTING] : Production Rule: Decl_Prime
+Matched: (
 
-Production Rule: Var_Type
-Matched FLOAT_TOK: float
+[FOR TESTING] : Production Rule: Var_Type
+Matched: float
 
-Production Rule: Param
-Matched IDENT: n
+[FOR TESTING] : Production Rule: GetIdentAndMatch
+Matched: n
 
-Production Rule: Param_List_Prime
-Matched COMMA: ,
+[FOR TESTING] : Production Rule: Param_List_Prime
+Matched: ,
 
-Production Rule: Var_Type
-Matched FLOAT_TOK: float
+[FOR TESTING] : Production Rule: Var_Type
+Matched: float
 
-Production Rule: Param
-Matched IDENT: m
+[FOR TESTING] : Production Rule: GetIdentAndMatch
+Matched: m
 
-Production Rule: Decl_Prime
-Matched RPAR: )
+[FOR TESTING] : Production Rule: Decl_Prime
+Matched: )
 
-Production Rule: Block
-Matched LBRA: {
+[FOR TESTING] : Production Rule: Block
+Matched: {
 
-Production Rule: Var_Type
-Matched FLOAT_TOK: float
+[FOR TESTING] : Production Rule: Var_Type
+Matched: float
 
-Production Rule: Local_Decl
-Matched IDENT: result
+[FOR TESTING] : Production Rule: GetIdentAndMatch
+Matched: result
 
-Production Rule: Local_Decl
-Matched SC: ;
+[FOR TESTING] : Production Rule: Local_Decl
+Matched: ;
 
-Production Rule: Var_Type
-Matched FLOAT_TOK: float
+[FOR TESTING] : Production Rule: Var_Type
+Matched: float
 
-Production Rule: Local_Decl
-Matched IDENT: x
+[FOR TESTING] : Production Rule: GetIdentAndMatch
+Matched: x
 
-Production Rule: Local_Decl
-Matched SC: ;
+[FOR TESTING] : Production Rule: Local_Decl
+Matched: ;
 
-Production Rule: Expr
-Matched IDENT: result
+[FOR TESTING] : Production Rule: GetIdentAndMatch
+Matched: result
 
-Production Rule: Expr
-Matched ASSIGN: =
+[FOR TESTING] : Production Rule: Expr
+Matched: =
 
-Production Rule: Rval_Ident
-Matched IDENT: n
-
-Production Rule: Rval_Add_Prime
-Matched PLUS: +
-
-Production Rule: Rval_Ident
-Matched IDENT: m
-
-Production Rule: Expr_Stmt
-Matched SC: ;
-
-Production Rule: If_Stmt
-Matched IF: if
-
-Production Rule: If_Stmt
-Matched LPAR: (
-
-Production Rule: Rval_Ident
-Matched IDENT: n
-
-Production Rule: Rval_Eq_Prime
-Matched EQ: ==
-
-Production Rule: Rval_Term
-Matched INT_LIT: 4
-
-Production Rule: If_Stmt
-Matched RPAR: )
-
-Production Rule: Block
-Matched LBRA: {
-
-Production Rule: Rval_Ident
-Matched IDENT: print_int
-
-Production Rule: Rval_Ident_Prime
-Matched LPAR: (
-
-Production Rule: Rval_Ident
-Matched IDENT: n
-
-Production Rule: Rval_Add_Prime
-Matched PLUS: +
-
-Production Rule: Rval_Ident
-Matched IDENT: m
-
-Production Rule: Rval_Ident_Prime
-Matched RPAR: )
-
-Production Rule: Expr_Stmt
-Matched SC: ;
-
-Production Rule: Block
-Matched RBRA: }
-
-Production Rule: Return_Stmt
-Matched RETURN: return
-
-Production Rule: Rval_Ident
-Matched IDENT: result
-
-Production Rule: Return_Stmt_Prime
-Matched SC: ;
-
-Production Rule: Block
-Matched RBRA: }
-
+Invalid Token Error: 
+Expected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS}
+Got: n (Type: -1) on-line: 10

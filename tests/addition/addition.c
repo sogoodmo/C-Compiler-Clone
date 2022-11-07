@@ -1,9 +1,6 @@
 // MiniC program to test addition
 extern float print_int(float X);
 
-
-
-
 float addition(float n, float m){
 	float result;
   float x;
