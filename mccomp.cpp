@@ -773,7 +773,7 @@ class ExprAST : public StmtAST {};
 /// =================================== !! Program & Decls END !! ================================================ ///
 
 // /// =================================== !! Functions Start !! ================================================ ///
-// #pragma region
+#pragma region
 // class FuncCallAST : public ExprAST {
 // 	TOKEN FuncName; 
 // 	std::vector<std::unique_ptr<ExprAST>> Args; 
@@ -818,8 +818,9 @@ class ExprAST : public StmtAST {};
 // 	// };
 // };
 
-// #pragma endregion
+#pragma endregion
 // /// =================================== !! Functions End !! ================================================ ///
+
 
 /// =================================== !! Variable's START !! ================================================ ///
 #pragma region
@@ -830,9 +831,13 @@ public:
 	Variable(TOKEN Ident)
 		: Ident(std::move(Ident)){}
 	
-	// virtual std::string to_string() const override{
-	// 	return Ident;
-	// };
+	virtual void to_string(const std::string &prefix, const std::string &nodeStr, bool isLeft) const override{
+		std::cout << prefix; 
+
+		std::cout << (isLeft ?  "├──" : "└──");
+
+		std::cout << "Variable: " << Ident.lexeme << std::endl;
+	};
 };
 class VariableDeclAST : public ASTnode {
 	VAR_TYPE Type; 
@@ -842,9 +847,13 @@ public:
 	VariableDeclAST(TOKEN Ident, VAR_TYPE Type)
 		: Ident(std::move(Ident)), Type(std::move(Type)) {}
 
-	// virtual std::string to_string() const override{
-	// 	return TypeToStr(Type) + " " + Name;
-	// };
+	virtual void to_string(const std::string &prefix, const std::string &nodeStr, bool isLeft) const override{
+		std::cout << prefix; 
+
+		std::cout << (isLeft ?  "├──" : "└──");
+
+		std::cout << nodeStr << " " << TypeToStr(Type) << " " << Ident.lexeme << std::endl;
+	};
 };
 class VariableAssignmentAST : public ExprAST {
 	TOKEN Ident; 
@@ -854,9 +863,17 @@ public:
 	VariableAssignmentAST(TOKEN Ident, std::unique_ptr<ExprAST> Expr)
 		: Ident(std::move(Ident)), Expr(std::move(Expr)) {} 	
 
-	// virtual std::string to_string() const override{
-	// 	return Ident + " = " + Expr; 
-	// };
+	virtual void to_string(const std::string &prefix, const std::string &nodeStr, bool isLeft) const override{
+		std::cout << prefix; 
+
+		std::cout << (isLeft ?  "├──" : "└──");
+
+		std::cout << "AssignExpr: " << Ident.lexeme << " =" << std::endl; 
+		
+
+		//Seg fault because it doesn't know WHICH expression to use 
+		Expr->to_string(prefix + (isLeft ? "│   " : "    "), "Expr", false);
+	};
 };
 #pragma endregion
 /// =================================== !! Variable's END !! ================================================ ///
@@ -895,14 +912,14 @@ public:
 		std::cout << "Block" << std::endl;
 
 		for (int i=0; i<VarDecls.size()-1; i++){
-			// VarDecls[i]->to_string(prefix + (isLeft ? "│   " : "    "), "LocalDecl", true);
+			VarDecls[i]->to_string(prefix + (isLeft ? "│   " : "    "), "LocalVarDecl", true);
 		}
-		// VarDecls[VarDecls.size()-1]->to_string(prefix + (isLeft ? "│   " : "    "), "LocalDecl", (StmtList.size() != 0));
+		VarDecls[VarDecls.size()-1]->to_string(prefix + (isLeft ? "│   " : "    "), "LocalVarDecl", (StmtList.size() != 0));
 
 		for (int i=0; i<StmtList.size()-1; i++){
-			// StmtList[i]->to_string(prefix + (isLeft ? "│   " : "    "), "Statement", true);
+			StmtList[i]->to_string(prefix + (isLeft ? "│   " : "    "), "Statement", true);
 		}
-		// StmtList[StmtList.size()-1]->to_string(prefix + (isLeft ? "│   " : "    "), "Statement", false);
+		StmtList[StmtList.size()-1]->to_string(prefix + (isLeft ? "│   " : "    "), "Statement", false);
 	};
 };
 class IfAST : public StmtAST{
@@ -913,9 +930,23 @@ public:
 	IfAST(std::unique_ptr<ExprAST> ConditionExpr, std::unique_ptr<BlockAST> TrueBlock, std::unique_ptr<BlockAST> ElseBlock)
 		: ConditionExpr(std::move(ConditionExpr)), TrueBlock(std::move(TrueBlock)), ElseBlock(std::move(ElseBlock)) {}
 	
-	// virtual std::string to_string() const override{
-	// 	return "IF ( )" + "-finish this later";
- 	// };
+	virtual void to_string(const std::string &prefix, const std::string &nodeStr, bool isLeft) const override{
+		std::cout << prefix; 
+
+		std::cout << (isLeft ?  "├──" : "└──");
+
+		std::cout << "IfStmt" << std::endl;
+
+		ConditionExpr->to_string(prefix + (isLeft ? "│   " : "    "), "ConditionExpr", true);
+
+		if (TrueBlock != nullptr){
+			TrueBlock->to_string(prefix + (isLeft ? "│   " : "    "), "TrueBlock", (ElseBlock != nullptr));
+		}
+
+		if (ElseBlock != nullptr){
+			ElseBlock->to_string(prefix + (isLeft ? "│   " : "    "), "ElseBlock", false);
+		}
+ 	};
 };
 class WhileAST : public StmtAST{
 	std::unique_ptr<ExprAST> ConditionExpr;
@@ -925,9 +956,18 @@ public:
 	WhileAST(std::unique_ptr<ExprAST> ConditionExpr, std::unique_ptr<StmtAST> LoopBlock)
 		: ConditionExpr(std::move(ConditionExpr)), LoopBlock(std::move(LoopBlock)) {}
 	
-	// virtual std::string to_string() const override{
-	// 	return "WHILE ( )" + "-finish this later";
-	// };
+	virtual void to_string(const std::string &prefix, const std::string &nodeStr, bool isLeft) const override{
+		std::cout << prefix; 
+
+		std::cout << (isLeft ?  "├──" : "└──");
+
+		std::cout << "WhileLoop" << std::endl;
+		ConditionExpr->to_string(prefix + (isLeft ? "│   " : "    "), "ConditionExpr", (LoopBlock != nullptr));
+
+		if (LoopBlock != nullptr){
+			LoopBlock->to_string(prefix + (isLeft ? "│   " : "    "), "LoopBlock", false);
+		}
+	};
 };
 class ReturnAST : public StmtAST {
 	std::unique_ptr<ExprAST> ReturnExpr;
@@ -936,10 +976,19 @@ public:
 	ReturnAST(std::unique_ptr<ExprAST> ReturnExpr)
 		: ReturnExpr(std::move(ReturnExpr)) {}
 
-	// virtual std::string to_string() const override{
-	// 	return "RETURN ( )" + "-finish this later";
-	// };
+	virtual void to_string(const std::string &prefix, const std::string &nodeStr, bool isLeft) const override{
+		std::cout << prefix; 
+
+		std::cout << (isLeft ?  "├──" : "└──");
+
+		std::cout << ((ReturnExpr != nullptr) ? "Return" : "Void Return") << std::endl;
+
+		if (ReturnExpr != nullptr){
+			ReturnExpr->to_string(prefix + (isLeft ? "│   " : "    "), "ReturnExpr", false);
+		}
+	};
 };
+
 // 	std::unique_ptr<VariableAssignmentAST> VarAss; 
 // 	std::unique_ptr<BinaryExprAST> BinaryExpr; 
 // 	std::unique_ptr<UnaryExprAST> UnaryExpr;
@@ -967,10 +1016,18 @@ public:
 	BinaryExprAST(TOKEN Op, std::unique_ptr<ExprAST> LHS, std::unique_ptr<ExprAST> RHS) 
 		: Op(std::move(Op)), LHS(std::move(LHS)), RHS(std::move(RHS)) {}
 
-	// virtual std::string to_string() const override {
-	// 	return "need to implement";
-	// };
+	virtual void to_string(const std::string &prefix, const std::string &nodeStr, bool isLeft) const override {
+		std::cout << prefix; 
+
+		std::cout << (isLeft ?  "├──" : "└──");
+
+		std::cout << "BinaryExpr Op: " << Op.lexeme << std::endl;
+
+		LHS->to_string(prefix + (isLeft ? "│   " : "    "), "LHS", true);
+		RHS->to_string(prefix + (isLeft ? "│   " : "    "), "RHS", false);
+	};
 };
+
 class UnaryExprAST : public ExprAST {
 	TOKEN Op;
 	std::unique_ptr<ExprAST> Expr; 
@@ -979,9 +1036,15 @@ public:
 	UnaryExprAST(TOKEN Op, std::unique_ptr<ExprAST> Expr) 
 		: Op(std::move(Op)), Expr(std::move(Expr)) {}
 
-	// virtual std::string to_string() const override {
-	// 	return "need to fix";
-	// };
+	virtual void to_string(const std::string &prefix, const std::string &nodeStr, bool isLeft) const override {
+		std::cout << prefix; 
+
+		std::cout << (isLeft ?  "├──" : "└──");
+
+		std::cout << "UnaryExpr Op: " << Op.lexeme << std::endl;
+
+		Expr->to_string(prefix + (isLeft ? "│   " : "    "), "Expr", false);
+	};
 };
 #pragma endregion
 /// =================================== !! Binary / Unary AST End !! ================================================ ///
@@ -995,9 +1058,13 @@ public:
 	IntegerAST(TOKEN Val) 
 		: Val(std::move(Val)){}
 
-	// virtual void to_string(const std::string &prefix, const std::string &nodeStr, bool isLeft) const override {
-	// 	return ;
-	// };
+	virtual void to_string(const std::string &prefix, const std::string &nodeStr, bool isLeft) const override {
+		std::cout << prefix; 
+
+		std::cout << (isLeft ?  "├──" : "└──");
+
+		std::cout << "Int Literal: " << Val.lexeme << std::endl;
+	};
 };
 class FloatAST : public ExprAST {
 	TOKEN Val;
@@ -1006,9 +1073,13 @@ public:
 	FloatAST(TOKEN Val) 
 		: Val(std::move(Val)){}
 
-	// virtual void to_string(const std::string &prefix, const std::string &nodeStr, bool isLeft) const override {
-	// 	return ;
-	// };
+	virtual void to_string(const std::string &prefix, const std::string &nodeStr, bool isLeft) const override {
+		std::cout << prefix; 
+
+		std::cout << (isLeft ?  "├──" : "└──");
+
+		std::cout << "Float Literal: " << Val.lexeme << std::endl;
+	};
 };
 class BoolAST : public ExprAST {
 	TOKEN Val;
@@ -1017,13 +1088,18 @@ public:
 	BoolAST(TOKEN Val) 
 		: Val(std::move(Val)){}
 
-	// virtual void to_string(const std::string &prefix, const std::string &nodeStr, bool isLeft) const override {
-	// 	return;
-	// };
+	virtual void to_string(const std::string &prefix, const std::string &nodeStr, bool isLeft) const override {
+		std::cout << prefix; 
+
+		std::cout << (isLeft ?  "├──" : "└──");
+
+		std::cout << "Bool Literal: " << Val.lexeme << std::endl;
+	};
 };
 class VoidAST : public ExprAST {};
 #pragma endregion
 // =================================== !! Literal AST End !! ================================================ ///
+
 /// =================================== !! Functions Start !! ================================================ ///
 #pragma region
 class ParamAST : public ASTnode {
@@ -1051,11 +1127,17 @@ public:
 	FuncCallAST(TOKEN FuncName, std::vector<std::unique_ptr<ExprAST>> Args)
 		: FuncName(std::move(FuncName)), Args(std::move(Args)) {}
 
-	// virtual std::string to_string() const override{
-	// 	return FuncName + " Add call";
-	// }
-};
+	virtual void to_string(const std::string &prefix, const std::string &nodeStr, bool isLeft) const override{
+		std::cout << prefix; 
 
+		std::cout << (isLeft ?  "├──" : "└──");
+
+		std::cout << "FuncCall " << FuncName.lexeme << std::endl;
+
+		// TODO: 
+		// Add arguments to func call 
+	}
+};
 
 class FuncDeclAST : public ASTnode{
 	VAR_TYPE Type;
@@ -1088,9 +1170,9 @@ public:
 	};
 };
 
-
 #pragma endregion
 /// =================================== !! Functions End !! ================================================ ///
+
 /// ==================================== Program & Decls START !! =============================================== ///
 #pragma region
 class DeclAST : public ASTnode { 
@@ -1103,14 +1185,13 @@ public:
 
 	virtual void to_string(const std::string &prefix, const std::string &nodeStr, bool isLeft) const override{
 		if (FuncDecl != nullptr){
-			FuncDecl->to_string(prefix, "FuncDef", false);
+			FuncDecl->to_string(prefix, "FuncDef", isLeft);
 		}
 		if (VarDecl != nullptr){
-			VarDecl->to_string(prefix, "VarDecl", false);
+			VarDecl->to_string(prefix, "GlobalVarDecl", isLeft);
 		}
 	};
 };
-
 class ProgramAST : public ASTnode {
 	std::vector<std::unique_ptr<FuncDeclAST>> Extern_List; 
 	std::vector<std::unique_ptr<DeclAST>> Decl_List;
@@ -1125,9 +1206,9 @@ public:
 		std::cout << nodeStr << std::endl;
 
 		for (int i=0; i<Extern_List.size()-1; i++){
-			Extern_List[i]->to_string(prefix + (isLeft ? "│   " : "    "), "Extern", true);
+			Extern_List[i]->to_string(prefix + (isLeft ? "│   " : "    "), "ExternFunc", true);
 		}
-		Extern_List[Extern_List.size()-1]->to_string(prefix + (isLeft ? "│   " : "    "), "Extern", (Decl_List.size() != 0));
+		Extern_List[Extern_List.size()-1]->to_string(prefix + (isLeft ? "│   " : "    "), "ExternFunc", (Decl_List.size() != 0));
 
 		for (int i=0; i<Decl_List.size()-1; i++){
 			Decl_List[i]->to_string(prefix + (isLeft ? "│   " : "    "), "GlobalDecl", true);

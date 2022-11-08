@@ -1,6 +1,7 @@
 // MiniC program to test while loop
 
-extern int print_int(int X);
+extern int foo(int x, int y);
+extern int bar(int a, int b);
 
 int test;
 float f;
