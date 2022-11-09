@@ -1,81 +1,452 @@
-[FOR TESTING] : Production Rule: Extern
-Matched: extern
-
-[FOR TESTING] : Production Rule: Var_Type
-Matched: float
-
-[FOR TESTING] : Production Rule: GetIdentAndMatch
-Matched: print_int
-
-[FOR TESTING] : Production Rule: Extern
-Matched: (
-
-[FOR TESTING] : Production Rule: Var_Type
-Matched: float
-
-[FOR TESTING] : Production Rule: GetIdentAndMatch
-Matched: X
-
-[FOR TESTING] : Production Rule: Extern
-Matched: )
-
-[FOR TESTING] : Production Rule: Extern
-Matched: ;
-
-[FOR TESTING] : Production Rule: Var_Type
-Matched: float
-
-[FOR TESTING] : Production Rule: GetIdentAndMatch
-Matched: addition
-
-[FOR TESTING] : Production Rule: Decl_Prime
-Matched: (
-
-[FOR TESTING] : Production Rule: Var_Type
-Matched: float
-
-[FOR TESTING] : Production Rule: GetIdentAndMatch
-Matched: n
-
-[FOR TESTING] : Production Rule: Param_List_Prime
-Matched: ,
-
-[FOR TESTING] : Production Rule: Var_Type
-Matched: float
-
-[FOR TESTING] : Production Rule: GetIdentAndMatch
-Matched: m
-
-[FOR TESTING] : Production Rule: Decl_Prime
-Matched: )
-
-[FOR TESTING] : Production Rule: Block
-Matched: {
-
-[FOR TESTING] : Production Rule: Var_Type
-Matched: float
-
-[FOR TESTING] : Production Rule: GetIdentAndMatch
-Matched: result
-
-[FOR TESTING] : Production Rule: Local_Decl
-Matched: ;
-
-[FOR TESTING] : Production Rule: Var_Type
-Matched: float
-
-[FOR TESTING] : Production Rule: GetIdentAndMatch
-Matched: x
-
-[FOR TESTING] : Production Rule: Local_Decl
-Matched: ;
-
-[FOR TESTING] : Production Rule: GetIdentAndMatch
-Matched: result
-
-[FOR TESTING] : Production Rule: Expr
-Matched: =
-
-Invalid Token Error: 
-Expected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS}
-Got: n (Type: -1) on-line: 10
+Program
+    ├──ExternFunc void foo
+    │   ├──Param int x
+    │   └──Param int y
+    ├──ExternFunc void bar
+    ├──GlobalVarDecl int test
+    ├──GlobalVarDecl float f
+    ├──GlobalVarDecl bool b
+    └──FuncDef int While
+        ├──Param int n
+        └──Block
+            ├──LocalVarDecl int result
+            ├──AssignExpr: test =
+            │   └──Int Literal: 11
+            ├──AssignExpr: result =
+            │   └──Int Literal: 0
+            ├──FuncCall: print_int
+            │   └──Variable: test
+            ├──WhileLoop
+            │   ├──BinaryExpr: <
+            │   │   ├──Variable: result
+            │   │   └──Int Literal: 10
+            │   └──Block
+            │       ├──AssignExpr: result =
+            │       │   └──BinaryExpr: +
+            │       │       ├──Variable: result
+            │       │       └──Int Literal: 1
+            │       └──FuncCall: print_int
+            │           ├──BinaryExpr: +
+            │           │   ├──Int Literal: 3
+            │           │   └──Int Literal: 2
+            │           ├──BinaryExpr: +
+            │           │   ├──Variable: test
+            │           │   └──Variable: test
+            │           ├──UnaryExpr: -
+            │           │   └──Variable: result
+            │           ├──Variable: result
+            │           └──FuncCall: print_int
+            │               └──BinaryExpr: +
+            │                   ├──Int Literal: 3
+            │                   └──Int Literal: 2
+            └──Return
+Program
+    ├──ExternFunc void print_int
+    │   └──Param int X
+    └──FuncDef void Void
+        └──Block
+            ├──LocalVarDecl int result
+            ├──AssignExpr: result =
+            │   └──Int Literal: 0
+            ├──FuncCall: print_int
+            │   └──Variable: result
+            ├──WhileLoop
+            │   ├──BinaryExpr: <
+            │   │   ├──Variable: result
+            │   │   └──Int Literal: 10
+            │   └──Block
+            │       ├──AssignExpr: result =
+            │       │   └──BinaryExpr: +
+            │       │       ├──Variable: result
+            │       │       └──Int Literal: 1
+            │       └──FuncCall: print_int
+            │           └──Variable: result
+            └──Return
+Program
+    ├──ExternFunc void print_int
+    │   └──Param int X
+    ├──ExternFunc void print_float
+    │   └──Param float X
+    └──FuncDef float unary
+        ├──Param int n
+        ├──Param float m
+        └──Block
+            ├──LocalVarDecl float result
+            ├──LocalVarDecl float sum
+            ├──AssignExpr: sum =
+            │   └──Float Literal: 0.0
+            ├──AssignExpr: result =
+            │   └──BinaryExpr: +
+            │       ├──Variable: n
+            │       └──Variable: m
+            ├──FuncCall: print_float
+            │   └──Variable: result
+            ├──AssignExpr: sum =
+            │   └──BinaryExpr: +
+            │       ├──Variable: sum
+            │       └──Variable: result
+            ├──AssignExpr: result =
+            │   └──BinaryExpr: +
+            │       ├──Variable: n
+            │       └──UnaryExpr: -
+            │           └──Variable: m
+            ├──FuncCall: print_float
+            │   └──Variable: result
+            ├──AssignExpr: sum =
+            │   └──BinaryExpr: +
+            │       ├──Variable: sum
+            │       └──Variable: result
+            ├──AssignExpr: result =
+            │   └──BinaryExpr: +
+            │       ├──Variable: n
+            │       └──UnaryExpr: -
+            │           └──UnaryExpr: -
+            │               └──Variable: m
+            ├──FuncCall: print_float
+            │   └──Variable: result
+            ├──AssignExpr: sum =
+            │   └──BinaryExpr: +
+            │       ├──Variable: sum
+            │       └──Variable: result
+            ├──AssignExpr: result =
+            │   └──BinaryExpr: +
+            │       ├──UnaryExpr: -
+            │       │   └──Variable: n
+            │       └──UnaryExpr: -
+            │           └──Variable: m
+            ├──FuncCall: print_float
+            │   └──Variable: result
+            ├──AssignExpr: sum =
+            │   └──BinaryExpr: +
+            │       ├──Variable: sum
+            │       └──Variable: result
+            └──Return
+                └──Variable: sum
+Program
+    ├──FuncDef int multiplyNumbers
+    │   ├──Param int n
+    │  └──Block
+    │      ├──LocalVarDecl int result
+    │      ├──AssignExpr: result =
+    │      │   └──Int Literal: 0
+    │      ├──IfStmt
+    │      │   ├──BinaryExpr: >=
+    │      │   │   ├──Variable: n
+    │      │   │   └──Int Literal: 1
+    │      │   ├──Block
+    │      │   │   └──AssignExpr: result =
+    │      │   │       └──BinaryExpr: *
+    │      │   │           ├──Variable: n
+    │      │   │           └──FuncCall: multiplyNumbers
+    │      │   │               └──BinaryExpr: -
+    │      │   │                   ├──Variable: n
+    │      │   │                   └──Int Literal: 1
+    │      │   └──Block
+    │      │       └──AssignExpr: result =
+    │      │           └──Int Literal: 1
+    │      └──Return
+    │          └──Variable: result
+    └──FuncDef int rfact
+        ├──Param int n
+        └──Block
+            └──Return
+                └──FuncCall: multiplyNumbers
+                    └──Variable: n
+Program
+    ├──ExternFunc void print_int
+    │   └──Param int X
+    ├──FuncDef int addNumbers
+    │   ├──Param int n
+    │  └──Block
+    │      ├──LocalVarDecl int result
+    │      ├──AssignExpr: result =
+    │      │   └──Int Literal: 0
+    │      ├──IfStmt
+    │      │   ├──BinaryExpr: !=
+    │      │   │   ├──Variable: n
+    │      │   │   └──Int Literal: 0
+    │      │   ├──Block
+    │      │   │   └──AssignExpr: result =
+    │      │   │       └──BinaryExpr: +
+    │      │   │           ├──Variable: n
+    │      │   │           └──FuncCall: addNumbers
+    │      │   │               └──BinaryExpr: -
+    │      │   │                   ├──Variable: n
+    │      │   │                   └──Int Literal: 1
+    │      │   └──Block
+    │      │       └──AssignExpr: result =
+    │      │           └──Variable: n
+    │      ├──FuncCall: print_int
+    │      │   └──Variable: result
+    │      └──Return
+    │          └──Variable: result
+    └──FuncDef int recursion_driver
+        ├──Param int num
+        └──Block
+            └──Return
+                └──FuncCall: addNumbers
+                    └──Variable: num
+Program
+    └──FuncDef float pi
+        └──Block
+            ├──LocalVarDecl bool flag
+            ├──LocalVarDecl float PI
+            ├──LocalVarDecl int i
+            ├──AssignExpr: flag =
+            │   └──Bool Literal: true
+            ├──AssignExpr: PI =
+            │   └──Float Literal: 3.0
+            ├──AssignExpr: i =
+            │   └──Int Literal: 2
+            ├──WhileLoop
+            │   ├──BinaryExpr: <
+            │   │   ├──Variable: i
+            │   │   └──Int Literal: 100
+            │   └──Block
+            │       ├──IfStmt
+            │       │   ├──Variable: flag
+            │       │   ├──Block
+            │       │   │   └──AssignExpr: PI =
+            │       │   │       └──BinaryExpr: +
+            │       │   │           ├──Variable: PI
+            │       │   │           └──BinaryExpr: /
+            │       │   │               ├──Float Literal: 4.0
+            │       │   │               └──BinaryExpr: *
+            │       │   │                   ├──BinaryExpr: *
+            │       │   │                   │   ├──Variable: i
+            │       │   │                   │   └──BinaryExpr: +
+            │       │   │                   │       ├──Variable: i
+            │       │   │                   │       └──Int Literal: 2
+            │       │   │                   └──BinaryExpr: +
+            │       │   │                       ├──Variable: i
+            │       │   │                       └──Int Literal: 1
+            │       │   └──Block
+            │       │       └──AssignExpr: PI =
+            │       │           └──BinaryExpr: -
+            │       │               ├──Variable: PI
+            │       │               └──BinaryExpr: /
+            │       │                   ├──Float Literal: 4.0
+            │       │                   └──BinaryExpr: *
+            │       │                       ├──BinaryExpr: *
+            │       │                       │   ├──Variable: i
+            │       │                       │   └──BinaryExpr: +
+            │       │                       │       ├──Variable: i
+            │       │                       │       └──Int Literal: 2
+            │       │                       └──BinaryExpr: +
+            │       │                           ├──Variable: i
+            │       │                           └──Int Literal: 1
+            │       ├──AssignExpr: flag =
+            │       │   └──UnaryExpr: !
+            │       │       └──Variable: flag
+            │       └──AssignExpr: i =
+            │           └──BinaryExpr: +
+            │               ├──Variable: i
+            │               └──Int Literal: 2
+            └──Return
+                └──Variable: PI
+Program
+    └──FuncDef bool palindrome
+        ├──Param int number
+        └──Block
+            ├──LocalVarDecl int t
+            ├──LocalVarDecl int rev
+            ├──LocalVarDecl int rmndr
+            ├──LocalVarDecl bool result
+            ├──AssignExpr: rev =
+            │   └──Int Literal: 0
+            ├──AssignExpr: result =
+            │   └──Bool Literal: false
+            ├──AssignExpr: t =
+            │   └──Variable: number
+            ├──WhileLoop
+            │   ├──BinaryExpr: >
+            │   │   ├──Variable: number
+            │   │   └──Int Literal: 0
+            │   └──Block
+            │       ├──AssignExpr: rmndr =
+            │       │   └──BinaryExpr: %
+            │       │       ├──Variable: number
+            │       │       └──Int Literal: 10
+            │       ├──AssignExpr: rev =
+            │       │   └──BinaryExpr: +
+            │       │       ├──BinaryExpr: *
+            │       │       │   ├──Variable: rev
+            │       │       │   └──Int Literal: 10
+            │       │       └──Variable: rmndr
+            │       └──AssignExpr: number =
+            │           └──BinaryExpr: /
+            │               ├──Variable: number
+            │               └──Int Literal: 10
+            ├──IfStmt
+            │   ├──BinaryExpr: ==
+            │   │   ├──Variable: t
+            │   │   └──Variable: rev
+            │   ├──Block
+            │   │   └──AssignExpr: result =
+            │   │       └──Bool Literal: true
+            │   └──Block
+            │       └──AssignExpr: result =
+            │           └──Bool Literal: false
+            └──Return
+                └──Variable: result
+Program
+    ├──ExternFunc void print_int
+    │   └──Param int X
+    └──FuncDef int fibonacci
+        ├──Param int n
+        └──Block
+            ├──LocalVarDecl int first
+            ├──LocalVarDecl int second
+            ├──LocalVarDecl int next
+            ├──LocalVarDecl int c
+            ├──LocalVarDecl int total
+            ├──FuncCall: print_int
+            │   └──Variable: n
+            ├──AssignExpr: first =
+            │   └──Int Literal: 0
+            ├──AssignExpr: second =
+            │   └──Int Literal: 1
+            ├──AssignExpr: c =
+            │   └──Int Literal: 1
+            ├──AssignExpr: total =
+            │   └──Int Literal: 0
+            ├──WhileLoop
+            │   ├──BinaryExpr: <
+            │   │   ├──Variable: c
+            │   │   └──Variable: n
+            │   └──Block
+            │       ├──IfStmt
+            │       │   ├──BinaryExpr: <=
+            │       │   │   ├──Variable: c
+            │       │   │   └──Int Literal: 1
+            │       │   ├──Block
+            │       │   │   └──AssignExpr: next =
+            │       │   │       └──Variable: c
+            │       │   └──Block
+            │       │       ├──AssignExpr: next =
+            │       │       │   └──BinaryExpr: +
+            │       │       │       ├──Variable: first
+            │       │       │       └──Variable: second
+            │       │       ├──AssignExpr: first =
+            │       │       │   └──Variable: second
+            │       │       └──AssignExpr: second =
+            │       │           └──Variable: next
+            │       ├──FuncCall: print_int
+            │       │   └──Variable: next
+            │       ├──AssignExpr: c =
+            │       │   └──BinaryExpr: +
+            │       │       ├──Variable: c
+            │       │       └──Int Literal: 1
+            │       └──AssignExpr: total =
+            │           └──BinaryExpr: +
+            │               ├──Variable: total
+            │               └──Variable: next
+            ├──FuncCall: print_int
+            │   └──Variable: total
+            └──Return
+                └──Variable: total
+Program
+    └──FuncDef int factorial
+        ├──Param int n
+        └──Block
+            ├──LocalVarDecl int i
+            ├──LocalVarDecl int factorial
+            ├──AssignExpr: factorial =
+            │   └──Int Literal: 1
+            ├──AssignExpr: i =
+            │   └──Int Literal: 1
+            ├──WhileLoop
+            │   ├──BinaryExpr: <=
+            │   │   ├──Variable: i
+            │   │   └──Variable: n
+            │   └──Block
+            │       ├──AssignExpr: factorial =
+            │       │   └──BinaryExpr: *
+            │       │       ├──Variable: factorial
+            │       │       └──Variable: i
+            │       └──AssignExpr: i =
+            │           └──BinaryExpr: +
+            │               ├──Variable: i
+            │               └──Int Literal: 1
+            └──Return
+                └──Variable: factorial
+Program
+    ├──ExternFunc void print_float
+    │   └──Param float X
+    └──FuncDef float cosine
+        ├──Param float x
+        └──Block
+            ├──LocalVarDecl float cos
+            ├──LocalVarDecl float n
+            ├──LocalVarDecl float term
+            ├──LocalVarDecl float eps
+            ├──LocalVarDecl float alt
+            ├──AssignExpr: eps =
+            │   └──Float Literal: 0.000001
+            ├──AssignExpr: n =
+            │   └──Float Literal: 1.0
+            ├──AssignExpr: cos =
+            │   └──Float Literal: 1.0
+            ├──AssignExpr: term =
+            │   └──Float Literal: 1.0
+            ├──AssignExpr: alt =
+            │   └──UnaryExpr: -
+            │       └──Float Literal: 1.0
+            ├──WhileLoop
+            │   ├──BinaryExpr: >
+            │   │   ├──Variable: term
+            │   │   └──Variable: eps
+            │   └──Block
+            │       ├──AssignExpr: term =
+            │       │   └──BinaryExpr: *
+            │       │       ├──BinaryExpr: *
+            │       │       │   ├──BinaryExpr: /
+            │       │       │   │   ├──BinaryExpr: /
+            │       │       │   │   │   ├──Variable: term
+            │       │       │   │   │   └──BinaryExpr: +
+            │       │       │   │   │       ├──Variable: n
+            │       │       │   │   │       └──Int Literal: 1
+            │       │       │   │   └──Variable: n
+            │       │       │   └──Variable: x
+            │       │       └──Variable: x
+            │       ├──AssignExpr: cos =
+            │       │   └──BinaryExpr: +
+            │       │       ├──Variable: cos
+            │       │       └──BinaryExpr: *
+            │       │           ├──Variable: alt
+            │       │           └──Variable: term
+            │       ├──AssignExpr: alt =
+            │       │   └──UnaryExpr: -
+            │       │       └──Variable: alt
+            │       └──AssignExpr: n =
+            │           └──BinaryExpr: +
+            │               ├──Variable: n
+            │               └──Int Literal: 2
+            ├──FuncCall: print_float
+            │   └──Variable: cos
+            └──Return
+                └──Variable: cos
+Program
+    ├──ExternFunc void print_int
+    │   └──Param float X
+    └──FuncDef float addition
+        ├──Param float n
+        ├──Param float m
+        └──Block
+            ├──LocalVarDecl float result
+            ├──LocalVarDecl float x
+            ├──AssignExpr: result =
+            │   └──BinaryExpr: +
+            │       ├──Variable: n
+            │       └──Variable: m
+            ├──IfStmt
+            │   ├──BinaryExpr: ==
+            │   │   ├──Variable: n
+            │   │   └──Int Literal: 4
+            │   └──Block
+            │       └──FuncCall: print_int
+            │           └──BinaryExpr: +
+            │               ├──Variable: n
+            │               └──Variable: m
+            └──Return
+                └──Variable: result

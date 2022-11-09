@@ -416,6 +416,9 @@ const std::string TypeToStr(VAR_TYPE type)
     }
 }
 
+
+
+
 // ---- AST Declerations Start ---- // 
 #pragma region 
 class ProgramAST; 
@@ -446,8 +449,16 @@ class VoidAST;
 
 class StmtAST : public ASTnode {};
 class ExprAST : public StmtAST {}; 
+
 #pragma endregion
 // ---- AST Declerations End ---- // 
+
+
+static void PrintVectorAST(std::vector<std::unique_ptr<ASTnode>> NodeVec, const std::string &prefix, bool isLeft, bool extraCon=false){
+	for (int i=0; i<NodeVec.size(); i++){
+		NodeVec[i]->to_string(prefix + (isLeft ? "│   " : "    "), "", (i != NodeVec.size() - 1) || extraCon);
+	}
+}
 
 
 /// =================================== !! Variable's START !! ================================================ ///
@@ -480,7 +491,7 @@ public:
 
 		std::cout << (isLeft ?  "├──" : "└──");
 
-		std::cout << nodeStr << " " << TypeToStr(Type) << " " << Ident.lexeme << std::endl;
+		std::cout << nodeStr << TypeToStr(Type) << " " << Ident.lexeme << std::endl;
 	};
 };
 class VariableAssignmentAST : public ExprAST {
@@ -497,13 +508,8 @@ public:
 		std::cout << (isLeft ?  "├──" : "└──");
 
 		std::cout << "AssignExpr: " << Ident.lexeme << " =" << std::endl; 
-		
 
-		//Seg fault because it doesn't know WHICH expression to use 
-		if (Expr == nullptr){
-			std::cout << "Lennon" << std::endl;
-		}
-		Expr->to_string(prefix + (isLeft ? "│   " : "    "), "Expr", false);
+		Expr->to_string(prefix + (isLeft ? "│   " : "    "), "", false);
 	};
 };
 #pragma endregion
@@ -527,18 +533,11 @@ public:
 
 		std::cout << "Block" << std::endl;
 
-		if (VarDecls.size() != 0){
-			for (int i=0; i<VarDecls.size()-1; i++){
-				VarDecls[i]->to_string(prefix + (isLeft ? "│   " : "    "), "LocalVarDecl", true);
-			}
-			VarDecls[VarDecls.size()-1]->to_string(prefix + (isLeft ? "│   " : "    "), "LocalVarDecl", (StmtList.size() != 0));
+		for (int i=0; i<VarDecls.size(); i++){
+			VarDecls[i]->to_string(prefix + (isLeft ? "│   " : "    "), "LocalVarDecl: ", (i != VarDecls.size() - 1) || (StmtList.size() != 0));
 		}
-
-		if (StmtList.size() != 0){
-			for (int i=0; i<StmtList.size()-1; i++){
-				StmtList[i]->to_string(prefix + (isLeft ? "│   " : "    "), "Statement", true);
-			}
-			StmtList[StmtList.size()-1]->to_string(prefix + (isLeft ? "│   " : "    "), "Statement", false);
+		for (int i=0; i<StmtList.size(); i++){
+			StmtList[i]->to_string(prefix + (isLeft ? "│   " : "    "), "", (i != StmtList.size() - 1));
 		}
 
 	};
@@ -558,17 +557,18 @@ public:
 
 		std::cout << "IfStmt" << std::endl;
 
-		ConditionExpr->to_string(prefix + (isLeft ? "│   " : "    "), "ConditionExpr", true);
+		ConditionExpr->to_string(prefix + (isLeft ? "│   " : "    "), "", true);
 
 		if (TrueBlock != nullptr){
-			TrueBlock->to_string(prefix + (isLeft ? "│   " : "    "), "TrueBlock", (ElseBlock != nullptr));
+			TrueBlock->to_string(prefix + (isLeft ? "│   " : "    "), "", (ElseBlock != nullptr));
 		}
 
 		if (ElseBlock != nullptr){
-			ElseBlock->to_string(prefix + (isLeft ? "│   " : "    "), "ElseBlock", false);
+			ElseBlock->to_string(prefix + (isLeft ? "│   " : "    "), "", false);
 		}
  	};
 };
+
 class WhileAST : public StmtAST{
 	std::unique_ptr<ExprAST> ConditionExpr;
 	std::unique_ptr<StmtAST> LoopBlock; 
@@ -583,10 +583,10 @@ public:
 		std::cout << (isLeft ?  "├──" : "└──");
 
 		std::cout << "WhileLoop" << std::endl;
-		ConditionExpr->to_string(prefix + (isLeft ? "│   " : "    "), "ConditionExpr", (LoopBlock != nullptr));
+		ConditionExpr->to_string(prefix + (isLeft ? "│   " : "    "), "", (LoopBlock != nullptr));
 
 		if (LoopBlock != nullptr){
-			LoopBlock->to_string(prefix + (isLeft ? "│   " : "    "), "LoopBlock", false);
+			LoopBlock->to_string(prefix + (isLeft ? "│   " : "    "), "", false);
 		}
 	};
 };
@@ -675,7 +675,7 @@ public:
 
 		std::cout << (isLeft ?  "├──" : "└──");
 
-		std::cout << nodeStr << " " << TypeToStr(Type) << " " << Ident.lexeme << std::endl;
+		std::cout << nodeStr << TypeToStr(Type) << " " << Ident.lexeme << std::endl;
 	};
 };
 
@@ -695,12 +695,13 @@ public:
 		std::cout << "FuncCall: " << FuncName.lexeme << std::endl;
 
 		
-		if (Args.size() != 0){
-			for (int i=0; i<Args.size()-1; i++){
-				Args[i]->to_string(prefix + (isLeft ? "│   " : "    "), "FuncArg: ", true);
-			}
-			Args[Args.size()-1]->to_string(prefix + (isLeft ? "│   " : "    "), "FuncArg: ", false);
-		}
+		PrintVectorAST(std::move(Args), prefix, isLeft);
+
+		// for (int i=0; i<Args.size(); i++){
+		// 	// Using (i != Args.size() - 1) to check if it's the right most leaf
+		// 	// Since we only want the last element in the vector to be treated as the right most leaf
+		// 	Args[i]->to_string(prefix + (isLeft ? "│   " : "    "), "", (i != Args.size() - 1));
+		// }
 	}
 };
 
@@ -721,13 +722,13 @@ public:
 
 		std::cout << (isLeft ?  "├──" : "└──");
 
-		std::cout << nodeStr << " " << TypeToStr(Type) << " " << Ident.lexeme << std::endl;
+		std::cout << nodeStr << TypeToStr(Type) << " " << Ident.lexeme << std::endl;
 
 		if (Params.size() != 0){
 			for (int i=0; i<Params.size()-1; i++){
-				Params[i]->to_string(prefix + (isLeft ? "│   " : "    "), "Param", true);
+				Params[i]->to_string(prefix + (isLeft ? "│   " : "    "), "Param: ", true);
 			}
-			Params[Params.size()-1]->to_string(prefix + (isLeft ? "│   " : "    "), "Param", (FuncBlock != nullptr));
+			Params[Params.size()-1]->to_string(prefix + (isLeft ? "│   " : "    "), "Param: ", (FuncBlock != nullptr));
 		}
 
 		if (FuncBlock != nullptr){
@@ -773,6 +774,7 @@ public:
 		std::cout << "Float Literal: " << Val.lexeme << std::endl;
 	};
 };
+
 class BoolAST : public ExprAST {
 	TOKEN Val;
 
@@ -802,10 +804,10 @@ public:
 
 	virtual void to_string(const std::string &prefix, const std::string &nodeStr, bool isLeft) const override{
 		if (FuncDecl != nullptr){
-			FuncDecl->to_string(prefix, "FuncDef", isLeft);
+			FuncDecl->to_string(prefix, "FuncDef: ", isLeft);
 		}
 		if (VarDecl != nullptr){
-			VarDecl->to_string(prefix, "GlobalVarDecl", isLeft);
+			VarDecl->to_string(prefix, "GlobalVarDecl: ", isLeft);
 		}
 	};
 };
@@ -824,9 +826,9 @@ public:
 
 		if (ExternList.size() != 0){
 			for (int i=0; i<ExternList.size()-1; i++){
-				ExternList[i]->to_string(prefix + (isLeft ? "│   " : "    "), "ExternFunc", true);
+				ExternList[i]->to_string(prefix + (isLeft ? "│   " : "    "), "ExternFunc: ", true);
 			}
-			ExternList[ExternList.size()-1]->to_string(prefix + (isLeft ? "│   " : "    "), "ExternFunc", (DeclList.size() != 0));
+			ExternList[ExternList.size()-1]->to_string(prefix + (isLeft ? "│   " : "    "), "ExternFunc: ", (DeclList.size() != 0));
 		}
 
 		if (DeclList.size() != 0){
@@ -2132,7 +2134,6 @@ static std::vector<std::unique_ptr<ParamAST>> Params(){
 
 
 static VAR_TYPE Var_Type(){
-	// cout << "Var_Type" << endl;
 	VAR_TYPE type; 
 	switch (CurTok.type)
 	{
@@ -2161,7 +2162,6 @@ static VAR_TYPE Var_Type(){
 }	
 
 static VAR_TYPE Type_Spec(){
-	// cout << "Type_Spec" << endl;
 	VAR_TYPE type; 
 	switch (CurTok.type)
 	{
@@ -2256,7 +2256,6 @@ static std::unique_ptr<DeclAST> Decl() {
 
 // decl_list_prime ::= decl decl_list_prime | epsilon
 static void Decl_List_Prime(std::vector<std::unique_ptr<DeclAST>> &decl_list){
-	// cout << "Decl_List_Prime" << endl;
 	switch (CurTok.type)
 	{
 		case VOID_TOK:
@@ -2313,7 +2312,7 @@ static std::unique_ptr<FuncDeclAST> Extern(){
 		{
 			Match(EXTERN, "EXTERN");
 
-			auto type = Type_Spec();
+			type = Type_Spec();
 			
 			ident = GetIdentAndMatch();
 
