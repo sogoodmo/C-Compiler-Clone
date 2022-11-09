@@ -1,15 +1,15 @@
 Program
-    ├──ExternFunc void foo
-    │   ├──Param int x
-    │   └──Param int y
-    ├──ExternFunc void bar
-    ├──GlobalVarDecl int test
-    ├──GlobalVarDecl float f
-    ├──GlobalVarDecl bool b
-    └──FuncDef int While
-        ├──Param int n
+    ├──ExternFunc: int foo
+    │  ├──Param: int x
+    │  └──Param: int y
+    ├──ExternFunc: int bar
+    ├──GlobalVarDecl: int test
+    ├──GlobalVarDecl: float f
+    ├──GlobalVarDecl: bool b
+    └──GlobalFuncDef: int While
+        ├──Param: int n
         └──Block
-            ├──LocalVarDecl int result
+            ├──LocalVarDecl: int result
             ├──AssignExpr: test =
             │   └──Int Literal: 11
             ├──AssignExpr: result =
@@ -41,11 +41,11 @@ Program
             │                   └──Int Literal: 2
             └──Return
 Program
-    ├──ExternFunc void print_int
-    │   └──Param int X
-    └──FuncDef void Void
+    ├──ExternFunc: int print_int
+    │  └──Param: int X
+    └──GlobalFuncDef: void Void
         └──Block
-            ├──LocalVarDecl int result
+            ├──LocalVarDecl: int result
             ├──AssignExpr: result =
             │   └──Int Literal: 0
             ├──FuncCall: print_int
@@ -63,16 +63,16 @@ Program
             │           └──Variable: result
             └──Return
 Program
-    ├──ExternFunc void print_int
-    │   └──Param int X
-    ├──ExternFunc void print_float
-    │   └──Param float X
-    └──FuncDef float unary
-        ├──Param int n
-        ├──Param float m
+    ├──ExternFunc: int print_int
+    │  └──Param: int X
+    ├──ExternFunc: float print_float
+    │  └──Param: float X
+    └──GlobalFuncDef: float unary
+        ├──Param: int n
+        ├──Param: float m
         └──Block
-            ├──LocalVarDecl float result
-            ├──LocalVarDecl float sum
+            ├──LocalVarDecl: float result
+            ├──LocalVarDecl: float sum
             ├──AssignExpr: sum =
             │   └──Float Literal: 0.0
             ├──AssignExpr: result =
@@ -123,10 +123,10 @@ Program
             └──Return
                 └──Variable: sum
 Program
-    ├──FuncDef int multiplyNumbers
-    │   ├──Param int n
+    ├──GlobalFuncDef: int multiplyNumbers
+    │  ├──Param: int n
     │  └──Block
-    │      ├──LocalVarDecl int result
+    │      ├──LocalVarDecl: int result
     │      ├──AssignExpr: result =
     │      │   └──Int Literal: 0
     │      ├──IfStmt
@@ -146,19 +146,19 @@ Program
     │      │           └──Int Literal: 1
     │      └──Return
     │          └──Variable: result
-    └──FuncDef int rfact
-        ├──Param int n
+    └──GlobalFuncDef: int rfact
+        ├──Param: int n
         └──Block
             └──Return
                 └──FuncCall: multiplyNumbers
                     └──Variable: n
 Program
-    ├──ExternFunc void print_int
-    │   └──Param int X
-    ├──FuncDef int addNumbers
-    │   ├──Param int n
+    ├──ExternFunc: int print_int
+    │  └──Param: int X
+    ├──GlobalFuncDef: int addNumbers
+    │  ├──Param: int n
     │  └──Block
-    │      ├──LocalVarDecl int result
+    │      ├──LocalVarDecl: int result
     │      ├──AssignExpr: result =
     │      │   └──Int Literal: 0
     │      ├──IfStmt
@@ -180,18 +180,18 @@ Program
     │      │   └──Variable: result
     │      └──Return
     │          └──Variable: result
-    └──FuncDef int recursion_driver
-        ├──Param int num
+    └──GlobalFuncDef: int recursion_driver
+        ├──Param: int num
         └──Block
             └──Return
                 └──FuncCall: addNumbers
                     └──Variable: num
 Program
-    └──FuncDef float pi
+    └──GlobalFuncDef: float pi
         └──Block
-            ├──LocalVarDecl bool flag
-            ├──LocalVarDecl float PI
-            ├──LocalVarDecl int i
+            ├──LocalVarDecl: bool flag
+            ├──LocalVarDecl: float PI
+            ├──LocalVarDecl: int i
             ├──AssignExpr: flag =
             │   └──Bool Literal: true
             ├──AssignExpr: PI =
@@ -245,13 +245,13 @@ Program
             └──Return
                 └──Variable: PI
 Program
-    └──FuncDef bool palindrome
-        ├──Param int number
+    └──GlobalFuncDef: bool palindrome
+        ├──Param: int number
         └──Block
-            ├──LocalVarDecl int t
-            ├──LocalVarDecl int rev
-            ├──LocalVarDecl int rmndr
-            ├──LocalVarDecl bool result
+            ├──LocalVarDecl: int t
+            ├──LocalVarDecl: int rev
+            ├──LocalVarDecl: int rmndr
+            ├──LocalVarDecl: bool result
             ├──AssignExpr: rev =
             │   └──Int Literal: 0
             ├──AssignExpr: result =
@@ -290,16 +290,16 @@ Program
             └──Return
                 └──Variable: result
 Program
-    ├──ExternFunc void print_int
-    │   └──Param int X
-    └──FuncDef int fibonacci
-        ├──Param int n
+    ├──ExternFunc: int print_int
+    │  └──Param: int X
+    └──GlobalFuncDef: int fibonacci
+        ├──Param: int n
         └──Block
-            ├──LocalVarDecl int first
-            ├──LocalVarDecl int second
-            ├──LocalVarDecl int next
-            ├──LocalVarDecl int c
-            ├──LocalVarDecl int total
+            ├──LocalVarDecl: int first
+            ├──LocalVarDecl: int second
+            ├──LocalVarDecl: int next
+            ├──LocalVarDecl: int c
+            ├──LocalVarDecl: int total
             ├──FuncCall: print_int
             │   └──Variable: n
             ├──AssignExpr: first =
@@ -346,11 +346,11 @@ Program
             └──Return
                 └──Variable: total
 Program
-    └──FuncDef int factorial
-        ├──Param int n
+    └──GlobalFuncDef: int factorial
+        ├──Param: int n
         └──Block
-            ├──LocalVarDecl int i
-            ├──LocalVarDecl int factorial
+            ├──LocalVarDecl: int i
+            ├──LocalVarDecl: int factorial
             ├──AssignExpr: factorial =
             │   └──Int Literal: 1
             ├──AssignExpr: i =
@@ -371,16 +371,16 @@ Program
             └──Return
                 └──Variable: factorial
 Program
-    ├──ExternFunc void print_float
-    │   └──Param float X
-    └──FuncDef float cosine
-        ├──Param float x
+    ├──ExternFunc: float print_float
+    │  └──Param: float X
+    └──GlobalFuncDef: float cosine
+        ├──Param: float x
         └──Block
-            ├──LocalVarDecl float cos
-            ├──LocalVarDecl float n
-            ├──LocalVarDecl float term
-            ├──LocalVarDecl float eps
-            ├──LocalVarDecl float alt
+            ├──LocalVarDecl: float cos
+            ├──LocalVarDecl: float n
+            ├──LocalVarDecl: float term
+            ├──LocalVarDecl: float eps
+            ├──LocalVarDecl: float alt
             ├──AssignExpr: eps =
             │   └──Float Literal: 0.000001
             ├──AssignExpr: n =
@@ -427,26 +427,74 @@ Program
             └──Return
                 └──Variable: cos
 Program
-    ├──ExternFunc void print_int
-    │   └──Param float X
-    └──FuncDef float addition
-        ├──Param float n
-        ├──Param float m
+    ├──ExternFunc: int int_arg
+    │  ├──Param: int x
+    │  └──Param: int a
+    ├──ExternFunc: float float_arg
+    │  └──Param: float y
+    ├──ExternFunc: bool bool_arg
+    │  └──Param: bool z
+    ├──ExternFunc: float no_arg
+    ├──GlobalVarDecl: bool bool_test
+    ├──GlobalVarDecl: float float_test
+    ├──GlobalVarDecl: int int_test
+    └──GlobalFuncDef: int test_func
+        ├──Param: float n
+        ├──Param: float m
         └──Block
-            ├──LocalVarDecl float result
-            ├──LocalVarDecl float x
-            ├──AssignExpr: result =
+            ├──LocalVarDecl: bool local_bool_test
+            ├──LocalVarDecl: float local_float_test
+            ├──LocalVarDecl: int local_int_test
+            ├──LocalVarDecl: int add
+            ├──LocalVarDecl: int sub
+            ├──LocalVarDecl: float div
+            ├──LocalVarDecl: float mod
+            ├──LocalVarDecl: float mul
+            ├──LocalVarDecl: bool neg
+            ├──LocalVarDecl: bool and
+            ├──LocalVarDecl: bool or
+            ├──AssignExpr: add =
             │   └──BinaryExpr: +
-            │       ├──Variable: n
-            │       └──Variable: m
+            │       ├──Int Literal: 1
+            │       └──Int Literal: 2
+            ├──AssignExpr: sub =
+            │   └──BinaryExpr: -
+            │       ├──Int Literal: 2
+            │       └──Int Literal: 1
+            ├──AssignExpr: div =
+            │   └──BinaryExpr: /
+            │       ├──Int Literal: 1
+            │       └──Int Literal: 2
+            ├──AssignExpr: mod =
+            │   └──BinaryExpr: %
+            │       ├──Int Literal: 1
+            │       └──Int Literal: 2
+            ├──AssignExpr: mul =
+            │   └──BinaryExpr: *
+            │       ├──Int Literal: 1
+            │       └──Int Literal: 2
+            ├──AssignExpr: neg =
+            │   └──UnaryExpr: !
+            │       └──Int Literal: 1
+            ├──AssignExpr: and =
+            │   └──BinaryExpr: &&
+            │       ├──Int Literal: 1
+            │       └──Int Literal: 2
+            ├──AssignExpr: or =
+            │   └──BinaryExpr: ||
+            │       ├──Int Literal: 1
+            │       └──Int Literal: 2
             ├──IfStmt
             │   ├──BinaryExpr: ==
-            │   │   ├──Variable: n
-            │   │   └──Int Literal: 4
+            │   │   ├──Variable: and
+            │   │   └──Int Literal: 1
             │   └──Block
-            │       └──FuncCall: print_int
-            │           └──BinaryExpr: +
-            │               ├──Variable: n
-            │               └──Variable: m
+            │       └──FuncCall: no_arg
+            ├──WhileLoop
+            │   ├──BinaryExpr: ==
+            │   │   ├──Variable: mod
+            │   │   └──Int Literal: 1
+            │   └──Block
+            │       └──FuncCall: no_arg
             └──Return
-                └──Variable: result
+                └──Variable: add
