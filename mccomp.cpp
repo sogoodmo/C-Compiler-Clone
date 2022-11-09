@@ -389,277 +389,6 @@ static void putBackToken(TOKEN tok) { tok_buffer.push_front(tok); }
 // AST nodes
 //===----------------------------------------------------------------------===//
 
-
-
-// Turning a vector of arguments into a nice string 
-// string format_args(vector<unique_ptr<ASTnode>> args){
-// 	string arg_str="";
-
-// 	for (int i = 0; i < args.size() - 1; i++){
-// 		arg_str.append(args[i]->to_string());
-// 		arg_str.append(", ");
-// 	}
-// 	return "(" + arg_str + args[args.size() - 1]->to_string() + ")";
-// }
-
-/// IntegerAST - Class for numeric literals like 1, 2, 10, 10
-// class IntegerAST : public ASTnode {
-// 	double Val;
-
-// public:
-// 	IntegerAST(int val) 
-// 		: Val(val){}
-
-// 	virtual string to_string() const override {
-// 		return std::to_string(Val);
-// 	};
-// };
-// /// FloatAST - Class for float literals like 1.3 2.1
-// class FloatAST : public ASTnode {
-// 	float Val;
-
-// public:
-// 	NumberAST(float val) 
-// 		: Val(val){}
-
-// 	virtual string to_string() const override {
-// 		return std::to_string(Val);
-// 	};
-// };
-// /// Bool - Class for boo literals like True, False
-// class BoolAST : public ASTnode {
-// 	bool Val;
-
-// public:
-// 	NumberAST(double val) 
-// 		: Val(val){}
-
-// 	virtual string to_string() const override {
-// 		return std::to_string(Val);
-// 	};
-// };
-// /// VariableAST - Class for variable names 
-// class VariableAST : public ASTnode {
-// 	string Name;
-// 	string Type; 
-
-// public:
-// 	VariableAST(string name, string type) 
-// 		: Name(name), Type(type) {}
-
-// 	virtual string to_string() const override {
-// 		return Type + " " + Name;
-// 	};
-// };
-// /// BinaryExpAST - Class for variable names 
-// class BinaryExprAST : public ASTnode {
-// 	char Op;
-// 	unique_ptr<ASTnode> LHS, RHS; 
-
-// public:
-// 	BinaryExprAST(char op, unique_ptr<ASTnode> LHS, unique_ptr<ASTnode> RHS) 
-// 		: Op(op), LHS(std::move(LHS)), RHS(std::move(RHS)) {}
-
-// 	virtual string to_string() const override {
-// 		return LHS->to_string() + Op + RHS->to_string();
-// 	};
-// };
-// /// UnaryExpAST - Class for variable names 
-// class UnaryExprAST : public ASTnode {
-// 	char Op;
-// 	unique_ptr<ASTnode> Expr; 
-
-
-// public:
-// 	UnaryExprAST(char op, unique_ptr<ASTnode> Expr) 
-// 		: Op(op), Expr(std::move(Expr)) {}
-
-// 	virtual string to_string() const override {
-// 		return Op + Expr->to_string();
-// 	};
-// };
-
-
-// /// FuncCallAST - Class for function calls 
-// class FuncCallAST : public ASTnode { 
-// 	string FuncName;
-// 	vector<unique_ptr<ASTnode>> FuncArgs; 
-
-// public:
-// 	FuncCallAST(string FuncName, vector<unique_ptr<ASTnode>> FuncArgs)
-// 		: FuncName(FuncName), FuncArgs(std::move(FuncArgs)) {}
-	
-// 	virtual string to_string() const override {
-// 		return FuncName + format_args(FuncArgs);
-// 	};
-// };
-
-
-// class Param : public ASTnode{
-// 	string Name;
-// 	string Type;
-	
-// public:
-// 	Param(string Name, string Type)
-// 		: Name(Name), Type(Type) {}
-	
-// 	virtual string to_string() const override{
-// 		return Type + " " + Name;
-// 	};
-// };
-
-// // FuncSignatureAST - Class for the a function signature
-// class FuncSignatureAST : public ASTnode {
-// 	string FuncName;
-// 	string FuncType; 
-// 	vector<FuncParamAST> FuncArgs; 
-	
-// public:
-// 	FuncSignatureAST(string FuncName, string FuncType, vector<FuncParamAST> FuncArgs) 
-// 		: FuncName(FuncName), FuncType(FuncType), FuncArgs(std::move(FuncArgs)) {}
-
-// 	virtual string to_string() const override{
-// 		return FuncType + " " + FuncName + format_args(FuncArgs);
-// 	};
-// };
-
-
-// class DeclAST; 
-
-
-
-// class UnaryExprAST : public ASTnode {
-// 	char Op;
-// 	unique_ptr<ExprAST> Expr; 
-
-// public:
-// 	UnaryExprAST(char op, unique_ptr<ASTnode> Expr) 
-// 		: Op(op), Expr(std::move(Expr)) {}
-
-// 	virtual string to_string() const override {
-// 		return Op + Expr->to_string();
-// 	};
-// };
-
-
-// class ExprAST : public ASTnode{
-// 	TOKEN Tok;
-// 	std::string Ident;
-// 	std::unique_ptr<ExprAST> Expr; 
-
-// public:
-// 	ExprAST(Token Tok, const std::string &Ident, std::unqiue_ptr<ExprAST> Expr)
-// 		: Tok(std::move(Tok)), Ident(Ident), Expr(std::move(Expr)) {}
-	
-// 	virtual std::string to_string() const override{
-		
-// 		// Basically just check if Ident is empty -> then the thing else -> ident=123
-// 		return Ident + " = " + Expr->to_string();
-// 	}
-// };
-
-// class IfAST : public ASTnode{
-// 	TOKEN Tok;
-// 	std::unique_ptr<ExprAST> ConditionExpr;
-// 	std::unique_ptr<BlockAST> TrueBlock; 
-// 	std::unique_ptr<BlockAST> ElseBlock; 
-
-// public:
-// 	IfAST(TOKEN Tok, std::unqiue_ptr<ExprAST> ConditionExpr, std::unique_ptr<BlockAST> TrueBlock, std::unqiue_ptr<BlockAST> ElseBlock)
-// 		: Tok(std::move(Tok)), ConditionExpr(std::move(ConditionExpr)), TrueBlock(std::move(TrueBlock)), ElseBlock(std::move(ElseBlock)) {}
-	
-// 	virtual std::string to_string() const override{
-// 		return "IF ( " + ConditionExpr->to_string() + " )" + "-finish this later";
-//  	};
-// };
-// class WhileAST : public ASTnode{
-// 	TOKEN Tok; 
-// 	std::unique_ptr<ExprAST> ConditionExpr;
-// 	std::unique_ptr<BlockAST> LoopBlock; 
-
-// public: 
-// 	WhileAST(TOKEN Tok, std::unqiue_ptr<ExprAST> ConditionExpr, std::unique_ptr<BlockAST> LoopBlock)
-// 		: Tok(std::move(Tok)), ConditionExpr(std::move(ConditionExpr)), LoopBlock(std::move(LoopBlock)) {}
-	
-// 	virtual std::string to_string() const override{
-// 		return "WHILE ( " + ConditionExpr->to_string() + " )" + "-finish this later";
-// 	};
-// };
-
-// class StmtAST : public ASTnode{
-// 	TOKEN Tok; 
-// 	std::unique_ptr<ExprAST> Expr;
-// 	std::unique_ptr<IfAST> If;
-// 	std::unique_ptr<WhileAST> While;
-// 	std::unique_ptr<ExprAST> Return;
-
-// public:
-// 	StmtAST(TOKEN Tok, std::unique_ptr<ExprAST> Expr, std::unique_ptr<IfAST> If, std::unique_ptr<WhileAST> While, std::unique_ptr<ReturnAST> Return)
-// 		: Tok(std::move(Tok)), Expr(std::move(Expr)), If(std::move(If)), While(std::move(While)), Return(std::move(Return)) {}
-	
-// 	virtual std::string to_string() const override{
-// 		return "fk";
-// 	};
-// };
-
-// class BlockAST : public ASTnode{
-// 	TOKEN Tok;
-// 	std::vector<std::unique_ptr<DeclAST>> Block_Decl_List; 
-// 	std::vector<std::unique_ptr<StmtAST>> Block_Stmt_List;
-
-// public:
-// 	BlockAST(std::vector<std::unique_ptr<DeclAST>> Block_Decl_List, std::vector<std::unique_ptr<StmtAST>> Block_Stmt_List, TOKEN Tok)
-// 		: Block_Decl_List(std::move(Block_Decl_List)), Block_Stmt_List(std::move(Block_Stmt_List)), Tok(std::move(Tok)) {}
-	
-// 	virtual std::string to_string() const override{
-// 		return "fl";
-// 	};
-// };
-
-// class ParamAST : public ASTnode {
-// 	TOKEN Tok;
-// 	VAR_TYPE Type;
-// 	std::string Ident;
-
-// public:
-// 	ParamAST(VAR_TYPE Type, const std::string &Ident, TOKEN Tok)
-// 		: Type(Type), Ident(Ident), Tok(std::move(Tok)) {}
-	
-// 	virtual std::string to_string() const override{
-// 		return TypeToStr(Type) + " " + Ident;
-// 	};
-// };
-
-// class ExternAST : public ASTnode {
-// 	TOKEN Tok; 
-// 	VAR_TYPE Type;
-// 	std::string Ident; 
-// 	std::vector<std::unique_ptr<ParamAST>> Params_List;
-
-// public:
-// 	ExternAST(VAR_TYPE Type, const std::string &Ident, std::vector<std::unique_ptr<ParamAST>> Params_List, TOKEN Tok)
-// 		: Type(Type), Ident(Ident), Params_List(std::move(Params_List)), Tok(std::move(Tok)) {}
-	
-// 	virtual std::string to_string() const override{
-// 		return "shit";
-// 	};
-// };
-
-// class DeclAST : public ASTnode{
-// 	TOKEN Tok;
-// 	VAR_TYPE Type;
-// 	std::vector<std::unique_ptr<ParamAST>> Params_List;
-// 	std::unique_ptr<BlockAST> Block; 
-
-// public:
-// 	DeclAST(std::vector<std::unique_ptr<ParamAST>> Params_List, std::unique_ptr<BlockAST> Block, VAR_TYPE Type, TOKEN Tok)
-// 		: Params_List(std::move(Params_List)), Block(std::move(Block)), Tok(std::move(Tok)), Type(Type) {}
-
-// 	virtual std::string to_string() const override{
-// 		return "";
-// 	};
-// };
-
 /// ASTnode - Base class for all AST nodes.
 class ASTnode {
 public:
@@ -720,107 +449,6 @@ class ExprAST : public StmtAST {};
 #pragma endregion
 // ---- AST Declerations End ---- // 
 
-/// ==================================== Program & Decls START !! =============================================== ///
-#pragma region
-// class ProgramAST : public ASTnode {
-// 	std::vector<std::unique_ptr<FuncDeclAST>> Extern_List; 
-// 	std::vector<std::unique_ptr<DeclAST>> Decl_List;
-	
-
-// public:
-// 	ProgramAST(std::vector<std::unique_ptr<FuncDeclAST>> Extern_List, std::vector<std::unique_ptr<DeclAST>> Decl_List)
-// 		: Extern_List(std::move(Extern_List)), Decl_List(std::move(Decl_List)) {}
-
-// 	virtual void to_string(const std::string &prefix, const std::string &nodeStr, bool isLeft) const override{
-
-// 		std::cout << nodeStr << std::endl;
-
-// 		for (const auto &extern_decl : Extern_List){
-// 			// extern_decl->to_string(prefix + (isLeft ? "│   " : "    "), "Extern", true);
-// 		}
-// 		for (const auto &decl : Decl_List){
-// 			decl->to_string(prefix + (isLeft ? "│   " : "    "), "Global Decl", false);
-// 		}
-// 	};
-// };
-
-// class DeclAST : public ASTnode { 
-// 	std::unique_ptr<FuncDeclAST> FuncDecl; 
-// 	std::unique_ptr<VariableDeclAST> VarDecl;
-
-// public:
-// 	DeclAST(std::unique_ptr<FuncDeclAST> FuncDecl, std::unique_ptr<VariableDeclAST> VarDecl)
-// 		: FuncDecl(std::move(FuncDecl)), VarDecl(std::move(VarDecl)) {}
-
-// 	virtual void to_string(const std::string &prefix, const std::string &nodeStr, bool isLeft) const override{
-		
-// 		std::cout << prefix; 
-
-// 		std::cout << (isLeft ?  "├──" : "└──");
-
-// 		std::cout << nodeStr << std::endl;
-
-// 		if (FuncDecl != nullptr){
-// 			// FuncDecl->to_string(prefix + (isLeft ? "│   " : "    "), "Function Decl", false);
-// 		}
-// 		if (VarDecl != nullptr){
-// 			// VarDecl->to_string(prefix + (isLeft ? "│   " : "    "), "Variable Decl", false);
-// 		}
-// 	};
-// };
-
-#pragma endregion
-/// =================================== !! Program & Decls END !! ================================================ ///
-
-// /// =================================== !! Functions Start !! ================================================ ///
-#pragma region
-// class FuncCallAST : public ExprAST {
-// 	TOKEN FuncName; 
-// 	std::vector<std::unique_ptr<ExprAST>> Args; 
-
-// public:
-// 	FuncCallAST(TOKEN FuncName, std::vector<std::unique_ptr<ExprAST>> Args)
-// 		: FuncName(std::move(FuncName)), Args(std::move(Args)) {}
-
-// 	// virtual std::string to_string() const override{
-// 	// 	return FuncName + " Add call";
-// 	// }
-// };
-
-
-// class FuncDeclAST : public ASTnode{
-// 	VAR_TYPE Type;
-// 	TOKEN Ident; 
-// 	std::vector<std::unique_ptr<ParamAST>> Params;
-	
-// 	//May be null - in the case of extern 
-// 	std::unique_ptr<BlockAST> FuncBlock; 
-
-// public:
-// 	FuncDeclAST(TOKEN Ident, VAR_TYPE Type, std::vector<std::unique_ptr<ParamAST>> Params, std::unique_ptr<BlockAST> FuncBlock)
-// 		: Ident(std::move(Ident)), Type(std::move(Type)), Params(std::move(Params)), FuncBlock(std::move(FuncBlock)) {}
-	
-// 	// virtual std::string to_string() const override{
-// 	// 	return TypeToStr(Type) + " " + Name + Params->to_string() + FuncBlock->to_string() ;
-// 	// }
-// };
-
-// class ParamAST : public ASTnode {
-// 	VAR_TYPE Type;
-// 	TOKEN Ident;
-
-// public:
-// 	ParamAST(TOKEN Ident, VAR_TYPE Type)
-// 		: Type(std::move(Type)), Ident(std::move(Ident)) {}
-	
-// 	// virtual std::string to_string() const override{
-// 	// 	return TypeToStr(Type) + " " + Ident;
-// 	// };
-// };
-
-#pragma endregion
-// /// =================================== !! Functions End !! ================================================ ///
-
 
 /// =================================== !! Variable's START !! ================================================ ///
 #pragma region
@@ -872,29 +500,17 @@ public:
 		
 
 		//Seg fault because it doesn't know WHICH expression to use 
+		if (Expr == nullptr){
+			std::cout << "Lennon" << std::endl;
+		}
 		Expr->to_string(prefix + (isLeft ? "│   " : "    "), "Expr", false);
 	};
 };
 #pragma endregion
 /// =================================== !! Variable's END !! ================================================ ///
 
-/// =================================== !! Block & Stmts Start !! ================================================ ///
+/// =================================== !! Block & Statements Start !! ================================================ ///
 #pragma region
-// class StmtAST : public ASTnode{
-// 	std::unique_ptr<ExprAST> Expr;
-// 	std::unique_ptr<IfAST> If;
-// 	std::unique_ptr<WhileAST> While;
-// 	std::unique_ptr<ReturnAST> Return;
-// 	std::unique_ptr<BlockAST> Block; 
-
-// public:
-// 	StmtAST(std::unique_ptr<ExprAST> Expr, std::unique_ptr<IfAST> If, std::unique_ptr<WhileAST> While, std::unique_ptr<ExprAST> Return, std::unique_ptr<BlockAST> Block)
-// 		: Expr(std::move(Expr)), If(std::move(If)), While(std::move(While)), Return(std::move(Return)), Block(std::move(Block)) {}
-	
-// 	// virtual std::string to_string() const override{
-// 	// 	return "fk";
-// 	// };
-// };
 
 class BlockAST : public StmtAST{
 	std::vector<std::unique_ptr<VariableDeclAST>> VarDecls; 
@@ -911,15 +527,20 @@ public:
 
 		std::cout << "Block" << std::endl;
 
-		for (int i=0; i<VarDecls.size()-1; i++){
-			VarDecls[i]->to_string(prefix + (isLeft ? "│   " : "    "), "LocalVarDecl", true);
+		if (VarDecls.size() != 0){
+			for (int i=0; i<VarDecls.size()-1; i++){
+				VarDecls[i]->to_string(prefix + (isLeft ? "│   " : "    "), "LocalVarDecl", true);
+			}
+			VarDecls[VarDecls.size()-1]->to_string(prefix + (isLeft ? "│   " : "    "), "LocalVarDecl", (StmtList.size() != 0));
 		}
-		VarDecls[VarDecls.size()-1]->to_string(prefix + (isLeft ? "│   " : "    "), "LocalVarDecl", (StmtList.size() != 0));
 
-		for (int i=0; i<StmtList.size()-1; i++){
-			StmtList[i]->to_string(prefix + (isLeft ? "│   " : "    "), "Statement", true);
+		if (StmtList.size() != 0){
+			for (int i=0; i<StmtList.size()-1; i++){
+				StmtList[i]->to_string(prefix + (isLeft ? "│   " : "    "), "Statement", true);
+			}
+			StmtList[StmtList.size()-1]->to_string(prefix + (isLeft ? "│   " : "    "), "Statement", false);
 		}
-		StmtList[StmtList.size()-1]->to_string(prefix + (isLeft ? "│   " : "    "), "Statement", false);
+
 	};
 };
 class IfAST : public StmtAST{
@@ -981,26 +602,14 @@ public:
 
 		std::cout << (isLeft ?  "├──" : "└──");
 
-		std::cout << ((ReturnExpr != nullptr) ? "Return" : "Void Return") << std::endl;
+		std::cout << "Return" << std::endl;
 
 		if (ReturnExpr != nullptr){
-			ReturnExpr->to_string(prefix + (isLeft ? "│   " : "    "), "ReturnExpr", false);
+			ReturnExpr->to_string(prefix + (isLeft ? "│   " : "    "), "", false);
 		}
 	};
 };
 
-// 	std::unique_ptr<VariableAssignmentAST> VarAss; 
-// 	std::unique_ptr<BinaryExprAST> BinaryExpr; 
-// 	std::unique_ptr<UnaryExprAST> UnaryExpr;
-
-// public:
-// 	ExprAST(std::unique_ptr<VariableAssignmentAST> VarAss, std::unique_ptr<BinaryExprAST> BinaryExpr, std::unique_ptr<UnaryExprAST> UnaryExpr)
-// 		: VarAss(std::move(VarAss)), BinaryExpr(std::move(BinaryExpr)), UnaryExpr(std::move(UnaryExpr)) {}
-	
-// 	// virtual std::string to_string() const override{
-// 	// 	return "Fix this";
-// 	// };
-// };
 
 #pragma endregion
 /// =================================== !! Block & Stmts End !! ================================================ ///
@@ -1021,10 +630,10 @@ public:
 
 		std::cout << (isLeft ?  "├──" : "└──");
 
-		std::cout << "BinaryExpr Op: " << Op.lexeme << std::endl;
+		std::cout << "BinaryExpr: " << Op.lexeme << std::endl;
 
-		LHS->to_string(prefix + (isLeft ? "│   " : "    "), "LHS", true);
-		RHS->to_string(prefix + (isLeft ? "│   " : "    "), "RHS", false);
+		RHS->to_string(prefix + (isLeft ? "│   " : "    "), "", true);
+		LHS->to_string(prefix + (isLeft ? "│   " : "    "), "", false);
 	};
 };
 
@@ -1041,16 +650,99 @@ public:
 
 		std::cout << (isLeft ?  "├──" : "└──");
 
-		std::cout << "UnaryExpr Op: " << Op.lexeme << std::endl;
+		std::cout << "UnaryExpr: " << Op.lexeme << std::endl;
 
-		Expr->to_string(prefix + (isLeft ? "│   " : "    "), "Expr", false);
+		Expr->to_string(prefix + (isLeft ? "│   " : "    "), "", false);
 	};
 };
 #pragma endregion
 /// =================================== !! Binary / Unary AST End !! ================================================ ///
 
+// =================================== !! Literal AST End !! ================================================ ///
+
+/// =================================== !! Functions Start !! ================================================ ///
+#pragma region
+class ParamAST : public ASTnode {
+	VAR_TYPE Type;
+	TOKEN Ident;
+
+public:
+	ParamAST(TOKEN Ident, VAR_TYPE Type)
+		: Type(std::move(Type)), Ident(std::move(Ident)) {}
+	
+	virtual void to_string(const std::string &prefix, const std::string &nodeStr, bool isLeft) const override{
+		std::cout << prefix; 
+
+		std::cout << (isLeft ?  "├──" : "└──");
+
+		std::cout << nodeStr << " " << TypeToStr(Type) << " " << Ident.lexeme << std::endl;
+	};
+};
+
+class FuncCallAST : public ExprAST {
+	TOKEN FuncName; 
+	std::vector<std::unique_ptr<ExprAST>> Args; 
+
+public:
+	FuncCallAST(TOKEN FuncName, std::vector<std::unique_ptr<ExprAST>> Args)
+		: FuncName(std::move(FuncName)), Args(std::move(Args)) {}
+
+	virtual void to_string(const std::string &prefix, const std::string &nodeStr, bool isLeft) const override{
+		std::cout << prefix; 
+
+		std::cout << (isLeft ?  "├──" : "└──");
+
+		std::cout << "FuncCall: " << FuncName.lexeme << std::endl;
+
+		
+		if (Args.size() != 0){
+			for (int i=0; i<Args.size()-1; i++){
+				Args[i]->to_string(prefix + (isLeft ? "│   " : "    "), "FuncArg: ", true);
+			}
+			Args[Args.size()-1]->to_string(prefix + (isLeft ? "│   " : "    "), "FuncArg: ", false);
+		}
+	}
+};
+
+class FuncDeclAST : public ASTnode{
+	VAR_TYPE Type;
+	TOKEN Ident; 
+	std::vector<std::unique_ptr<ParamAST>> Params;
+	
+	//May be null - in the case of extern 
+	std::unique_ptr<BlockAST> FuncBlock; 
+
+public:
+	FuncDeclAST(TOKEN Ident, VAR_TYPE Type, std::vector<std::unique_ptr<ParamAST>> Params, std::unique_ptr<BlockAST> FuncBlock)
+		: Ident(std::move(Ident)), Type(std::move(Type)), Params(std::move(Params)), FuncBlock(std::move(FuncBlock)) {}
+	
+	virtual void to_string(const std::string &prefix, const std::string &nodeStr, bool isLeft) const override{
+		std::cout << prefix; 
+
+		std::cout << (isLeft ?  "├──" : "└──");
+
+		std::cout << nodeStr << " " << TypeToStr(Type) << " " << Ident.lexeme << std::endl;
+
+		if (Params.size() != 0){
+			for (int i=0; i<Params.size()-1; i++){
+				Params[i]->to_string(prefix + (isLeft ? "│   " : "    "), "Param", true);
+			}
+			Params[Params.size()-1]->to_string(prefix + (isLeft ? "│   " : "    "), "Param", (FuncBlock != nullptr));
+		}
+
+		if (FuncBlock != nullptr){
+			FuncBlock->to_string(prefix + (isLeft ? "│  " : "    "), "Block", false);
+		}
+
+	};
+};
+
+#pragma endregion
+/// =================================== !! Functions End !! ================================================ ///
 /// =================================== !! Literal AST Start !! ================================================ ///
 #pragma region
+class VoidAST : public ExprAST {};
+
 class IntegerAST : public ExprAST {
 	TOKEN Val;
 
@@ -1096,82 +788,7 @@ public:
 		std::cout << "Bool Literal: " << Val.lexeme << std::endl;
 	};
 };
-class VoidAST : public ExprAST {};
 #pragma endregion
-// =================================== !! Literal AST End !! ================================================ ///
-
-/// =================================== !! Functions Start !! ================================================ ///
-#pragma region
-class ParamAST : public ASTnode {
-	VAR_TYPE Type;
-	TOKEN Ident;
-
-public:
-	ParamAST(TOKEN Ident, VAR_TYPE Type)
-		: Type(std::move(Type)), Ident(std::move(Ident)) {}
-	
-	virtual void to_string(const std::string &prefix, const std::string &nodeStr, bool isLeft) const override{
-		std::cout << prefix; 
-
-		std::cout << (isLeft ?  "├──" : "└──");
-
-		std::cout << nodeStr << " " << TypeToStr(Type) << " " << Ident.lexeme << std::endl;
-	};
-};
-
-class FuncCallAST : public ExprAST {
-	TOKEN FuncName; 
-	std::vector<std::unique_ptr<ExprAST>> Args; 
-
-public:
-	FuncCallAST(TOKEN FuncName, std::vector<std::unique_ptr<ExprAST>> Args)
-		: FuncName(std::move(FuncName)), Args(std::move(Args)) {}
-
-	virtual void to_string(const std::string &prefix, const std::string &nodeStr, bool isLeft) const override{
-		std::cout << prefix; 
-
-		std::cout << (isLeft ?  "├──" : "└──");
-
-		std::cout << "FuncCall " << FuncName.lexeme << std::endl;
-
-		// TODO: 
-		// Add arguments to func call 
-	}
-};
-
-class FuncDeclAST : public ASTnode{
-	VAR_TYPE Type;
-	TOKEN Ident; 
-	std::vector<std::unique_ptr<ParamAST>> Params;
-	
-	//May be null - in the case of extern 
-	std::unique_ptr<BlockAST> FuncBlock; 
-
-public:
-	FuncDeclAST(TOKEN Ident, VAR_TYPE Type, std::vector<std::unique_ptr<ParamAST>> Params, std::unique_ptr<BlockAST> FuncBlock)
-		: Ident(std::move(Ident)), Type(std::move(Type)), Params(std::move(Params)), FuncBlock(std::move(FuncBlock)) {}
-	
-	virtual void to_string(const std::string &prefix, const std::string &nodeStr, bool isLeft) const override{
-		std::cout << prefix; 
-
-		std::cout << (isLeft ?  "├──" : "└──");
-
-		std::cout << nodeStr << " " << TypeToStr(Type) << " " << Ident.lexeme << std::endl;
-
-		for (int i=0; i<Params.size()-1; i++){
-			Params[i]->to_string(prefix + (isLeft ? "│   " : "    "), "Param", true);
-		}
-		Params[Params.size()-1]->to_string(prefix + (isLeft ? "│   " : "    "), "Param", (FuncBlock != nullptr));
-		
-		if (FuncBlock != nullptr){
-			FuncBlock->to_string(prefix + (isLeft ? "│  " : "    "), "Block", false);
-		}
-
-	};
-};
-
-#pragma endregion
-/// =================================== !! Functions End !! ================================================ ///
 
 /// ==================================== Program & Decls START !! =============================================== ///
 #pragma region
@@ -1193,27 +810,31 @@ public:
 	};
 };
 class ProgramAST : public ASTnode {
-	std::vector<std::unique_ptr<FuncDeclAST>> Extern_List; 
-	std::vector<std::unique_ptr<DeclAST>> Decl_List;
+	std::vector<std::unique_ptr<FuncDeclAST>> ExternList; 
+	std::vector<std::unique_ptr<DeclAST>> DeclList;
 	
 
 public:
-	ProgramAST(std::vector<std::unique_ptr<FuncDeclAST>> Extern_List, std::vector<std::unique_ptr<DeclAST>> Decl_List)
-		: Extern_List(std::move(Extern_List)), Decl_List(std::move(Decl_List)) {}
+	ProgramAST(std::vector<std::unique_ptr<FuncDeclAST>> ExternList, std::vector<std::unique_ptr<DeclAST>> DeclList)
+		: ExternList(std::move(ExternList)), DeclList(std::move(DeclList)) {}
 
 	virtual void to_string(const std::string &prefix, const std::string &nodeStr, bool isLeft) const override{
 
 		std::cout << nodeStr << std::endl;
 
-		for (int i=0; i<Extern_List.size()-1; i++){
-			Extern_List[i]->to_string(prefix + (isLeft ? "│   " : "    "), "ExternFunc", true);
+		if (ExternList.size() != 0){
+			for (int i=0; i<ExternList.size()-1; i++){
+				ExternList[i]->to_string(prefix + (isLeft ? "│   " : "    "), "ExternFunc", true);
+			}
+			ExternList[ExternList.size()-1]->to_string(prefix + (isLeft ? "│   " : "    "), "ExternFunc", (DeclList.size() != 0));
 		}
-		Extern_List[Extern_List.size()-1]->to_string(prefix + (isLeft ? "│   " : "    "), "ExternFunc", (Decl_List.size() != 0));
 
-		for (int i=0; i<Decl_List.size()-1; i++){
-			Decl_List[i]->to_string(prefix + (isLeft ? "│   " : "    "), "GlobalDecl", true);
+		if (DeclList.size() != 0){
+			for (int i=0; i<DeclList.size()-1; i++){
+				DeclList[i]->to_string(prefix + (isLeft ? "│   " : "    "), "GlobalDecl", true);
+			}
+			DeclList[DeclList.size()-1]->to_string(prefix + (isLeft ? "│   " : "    "), "GlobalDecl", false);
 		}
-		Decl_List[Decl_List.size()-1]->to_string(prefix + (isLeft ? "│   " : "    "), "GlobalDecl", false);
 	};
 };
 #pragma endregion
@@ -1227,6 +848,10 @@ public:
 // ----- Helper Functions ------ // 
 #pragma region
 
+/**
+ * @brief Custom exception class for parse errors 
+ * 
+ */
 class ParseException : public exception{
     string Err;
 public:
@@ -1248,7 +873,6 @@ static void Match(TOKEN_TYPE expectedTokenType, string errMessage, const char * 
 	if (CurTok.type != expectedTokenType){
 		throw ParseException("Invalid Token Error: " + errMessage);
 	}
-	// cout << "[FOR TESTING] : Production Rule: " << prodRule << endl << "Matched: " << CurTok.lexeme << endl << endl; 
 	getNextToken();
 }
 
@@ -1284,11 +908,28 @@ static bool ValidPresedenceLayer(int type){
  * @param CurTok 
  * @return TOKEN Token of identifer if no error, otherwise an error is a thrown 
  */
-static TOKEN GetIdentAndMatch(TOKEN CurTok){
+static TOKEN GetIdentAndMatch(){
 	TOKEN prev_token = CurTok; 
 	Match(IDENT, "Expected identifer token. ");
 	return prev_token; 
 }
+
+/**
+ * @brief Looks at the next token in the queue without removing it 
+ * 
+ * @return TOKEN Next token in the queue 
+ */
+static TOKEN PeekToken(){
+	TOKEN tmpToken = CurTok;
+
+	TOKEN nextToken = getNextToken();
+	putBackToken(nextToken); 
+
+	CurTok = tmpToken; 
+
+	return nextToken;
+}
+
 
 #pragma endregion
 // ----- Helper Functions End ------ // 
@@ -1428,7 +1069,7 @@ static std::vector<std::unique_ptr<ExprAST>> Args(){
 static std::unique_ptr<ExprAST> Rval_Term(){
 	std::unique_ptr<ExprAST> expr; 
 	TOKEN lit_tok; 
-
+	
 	switch (CurTok.type)
 	{
 		case BOOL_LIT:
@@ -1458,6 +1099,7 @@ static std::unique_ptr<ExprAST> Rval_Term(){
 		default:
 			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT}");
 	}
+
 	return expr; 
 }
 
@@ -1500,7 +1142,6 @@ static std::vector<std::unique_ptr<ExprAST>> Rval_Ident_Prime(){
 // rval_ident ::= IDENT rval_ident_prime | rval_term 
 static std::unique_ptr<ExprAST> Rval_Ident(){
 	std::unique_ptr<ExprAST> expr; 
-	// cout << "Rval_Ident" << endl;
 	switch (CurTok.type)
 	{
 		case BOOL_LIT:
@@ -1512,7 +1153,7 @@ static std::unique_ptr<ExprAST> Rval_Ident(){
 		}
 		case IDENT:
 		{
-			TOKEN ident = GetIdentAndMatch(CurTok);
+			TOKEN ident = GetIdentAndMatch();
 			
 			auto args = Rval_Ident_Prime();
 			
@@ -1524,6 +1165,7 @@ static std::unique_ptr<ExprAST> Rval_Ident(){
 			} else{
 				expr = std::make_unique<FuncCallAST>(std::move(ident), std::move(args));
 			}
+
 			break;
 		}
 		default:
@@ -1534,7 +1176,6 @@ static std::unique_ptr<ExprAST> Rval_Ident(){
 
 // rval_par ::= "(" expr ")" | rval_ident
 static std::unique_ptr<ExprAST> Rval_Par(){
-	// cout << "Rval_Par" << endl;
 	std::unique_ptr<ExprAST> expr; 
 	switch (CurTok.type)
 	{
@@ -1556,6 +1197,7 @@ static std::unique_ptr<ExprAST> Rval_Par(){
 		default:
 			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT}");
 	}
+	
 	return expr; 
 }
 
@@ -1598,6 +1240,7 @@ static std::unique_ptr<ExprAST> Rval_Neg(){
 		default:
 			throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS}");
 	}
+
 	return unary_expr; 
 }
 
@@ -1624,6 +1267,7 @@ static std::unique_ptr<ExprAST> Rval_Mul_Prime(std::unique_ptr<ExprAST> LHS){
 		case GE:
 		case PLUS:
 		case MINUS:
+			expr = std::move(LHS);
 			break;
 		case MOD:
 		{
@@ -1700,6 +1344,7 @@ static std::unique_ptr<ExprAST> Rval_Add_Prime(std::unique_ptr<ExprAST> LHS){
 		case GT:
 		case LE:
 		case GE:
+			expr = std::move(LHS);
 			break;
 		case PLUS:
 		{
@@ -1759,6 +1404,7 @@ static std::unique_ptr<ExprAST> Rval_Cmp_Prime(std::unique_ptr<ExprAST> LHS){
 		case AND:
 		case EQ:
 		case NE:
+			expr = std::move(LHS);
 			break;
 		case LT:
 		{
@@ -1838,6 +1484,7 @@ static std::unique_ptr<ExprAST> Rval_Eq_Prime(std::unique_ptr<ExprAST> LHS){
 		case SC:
 		case OR:
 		case AND:
+			expr = std::move(LHS);
 			break;
 		case EQ:
 		{
@@ -1895,6 +1542,7 @@ static std::unique_ptr<ExprAST> Rval_And_Prime(std::unique_ptr<ExprAST> LHS){
 		case RPAR:
 		case SC:
 		case OR:
+			expr = std::move(LHS);
 			break;
 		case AND:
 		{
@@ -1940,6 +1588,7 @@ static std::unique_ptr<ExprAST> Rval_Or_Prime(std::unique_ptr<ExprAST> LHS){
 		case COMMA:
 		case RPAR:
 		case SC:
+			expr = std::move(LHS);
 			break;
 		case OR:
 		{
@@ -1996,24 +1645,64 @@ static std::unique_ptr<ExprAST> Expr(){
 		// Must use extra look-ahead 
 		case IDENT: 
 		{
-			TOKEN tmpToken = CurTok;
+			// Peek func not working 
+			TOKEN NextTok = PeekToken();
 
-			TOKEN nextToken = getNextToken();
-			putBackToken(nextToken); 
+			/** Delete this if PeekWorking!
+				// TOKEN tmpToken = CurTok;
 
-			CurTok = tmpToken; 
+				// TOKEN NextTok = getNextToken();
+				// putBackToken(NextTok); 
 
-			if (nextToken.type == ASSIGN){
+				// CurTok = tmpToken; 
+			 */
+
+
+			// switch (nextToken.type)
+			// {
+			// 	case ASSIGN:
+			// 	{
+			// 		TOKEN ident = GetIdentAndMatch();
+			// 		Match(ASSIGN, "Expected '=' after variable identifer. ");
+			// 		std::cout << CurTok.lexeme << " " << CurTok.lineNo << std::endl;
+			// 		auto var_expr = Expr();
+			// 		std::cout << (var_expr == nullptr) << std::endl;
+
+			// 		if (var_expr == nullptr){
+			// 			std::cout << "lennon" << std::endl;
+			// 		} else{
+			// 			std::cout << "mo" << std::endl;
+			// 		}
+			// 		std::cout << std::endl;
+			// 		expr = std::make_unique<VariableAssignmentAST>(std::move(ident), std::move(var_expr));
+			// 		break;
+			// 	}
+			// 	case BOOL_LIT:
+			// 	case FLOAT_LIT:
+			// 	case INT_LIT:
+			// 	case LPAR:
+			// 	case NOT:
+			// 	case MINUS:
+			// 	case IDENT:
+			// 	{
+			// 		expr = Rval_Or();
+			// 		break;
+			// 	}
+			// 	default:
+			// 		throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS, SC}");
+			// }
+
+			if (NextTok.type == ASSIGN){
 				
-				TOKEN ident = GetIdentAndMatch(CurTok);
+				TOKEN ident = GetIdentAndMatch();
 				Match(ASSIGN, "Expected '=' after variable identifer. ");
-
 				auto var_expr = Expr();
 				expr = std::make_unique<VariableAssignmentAST>(std::move(ident), std::move(var_expr));
-
-			} else{
+			} 
+			else{
 				expr = Rval_Or();
 			}
+
 			break;
 		}
 		case SC:
@@ -2280,7 +1969,7 @@ static std::unique_ptr<VariableDeclAST> Local_Decl(){
 		case INT_TOK:
 		{
 			type = Var_Type();
-			ident = GetIdentAndMatch(CurTok);
+			ident = GetIdentAndMatch();
 
 			Match(SC, "Expeceted ';' after variable decleration. ");
 			break;
@@ -2362,7 +2051,7 @@ static std::unique_ptr<ParamAST> Param(){
 		case INT_TOK:
 		{
 			type = Var_Type();
-			ident = GetIdentAndMatch(CurTok);
+			ident = GetIdentAndMatch();
 			break;
 		}
 		default:
@@ -2494,55 +2183,6 @@ static VAR_TYPE Type_Spec(){
 	} 
 	return type; 
 }
-// fun_decl ::= type_spec IDENT "(" params ")" block
-// static std::unique_ptr<FuncDeclAST> Func_Decl(){
-// 	// cout << "Func_Decl" << endl;
-// 	VAR_TYPE type;
-// 	std::unique_ptr<BlockAST> block;
-// 	std::unique_ptr<ParamAST> params; 
-
-// 	switch (CurTok.type)
-// 	{
-// 		case VOID_TOK:
-// 		case BOOL_TOK:
-// 		case FLOAT_TOK:
-// 		case INT_TOK:
-// 			type = Type_Spec();
-// 			Match(IDENT, "Expected identifer after type decleration. ");
-// 			Match(LPAR, "Expected '(' after function decleration. ");
-// 			params = Params();
-// 			Match(RPAR, "Expected ')' after function parameters");
-// 			Block();
-// 			break;
-// 		default:
-// 			throw ParseException("Invalid Token Error: \nExpected: {VOID_TOK, BOOL_TOK, FLOAT_TOK, INT_TOK}");
-// 	}
-// }
-
-// var_decl ::= var_type IDENT ";"
-// static std::make_unique<VariableDeclAST> Var_Decl(){
-// 	VAR_TYPE type;
-// 	std::string ident; 
-
-// 	switch (CurTok.type)
-// 	{
-// 		case BOOL_TOK:
-// 		case FLOAT_TOK:
-// 		case INT_TOK:
-// 			type = Var_Type();
-
-// 			TOKEN prev_token = CurTok;
-// 			Match(IDENT, "Expected identifer after type decleration. ");
-// 			ident = prev_token.lexeme;
-
-// 			Match(SC, "Expeceted ';' after variable decleration. ");
-
-// 			break;
-// 		default:
-// 			throw ParseException("Invalid Token Error: \nExpected: {BOOL_TOK, FLOAT_TOK, INT_TOK}");
-// 	} 
-// 	return std::make_unique<VariableDeclAST>(ident, type);
-// }
 
 // decl_prime ::= ";" | "(" params ")" block
 static void Decl_Prime(std::unique_ptr<FuncDeclAST> &func_decl, std::unique_ptr<VariableDeclAST> &var_decl, VAR_TYPE type, TOKEN ident){
@@ -2584,7 +2224,7 @@ static std::unique_ptr<DeclAST> Decl() {
 		{
 			Match(VOID_TOK, "Expected 'void' token before function decleration. ");
 
-			TOKEN ident = GetIdentAndMatch(CurTok);
+			TOKEN ident = GetIdentAndMatch();
 
 			Match(LPAR, "Expeceted '(' after function identifer. ");
 			
@@ -2603,7 +2243,7 @@ static std::unique_ptr<DeclAST> Decl() {
 		{
 			auto type = Var_Type();
 
-			TOKEN ident = GetIdentAndMatch(CurTok);
+			TOKEN ident = GetIdentAndMatch();
 
 			Decl_Prime(func_decl, var_decl, type, ident);
 			break;
@@ -2675,7 +2315,7 @@ static std::unique_ptr<FuncDeclAST> Extern(){
 
 			auto type = Type_Spec();
 			
-			ident = GetIdentAndMatch(CurTok);
+			ident = GetIdentAndMatch();
 
 			Match(LPAR, "Expected '(' after identifer keyword.");
 			params = Params();
