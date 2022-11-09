@@ -34,189 +34,14 @@
 #include <utility>
 #include <vector>
 
+
 using namespace llvm;
 using namespace llvm::sys;
 using namespace std;
 
-//===-------------------- Forward Declerations -------------------------------===//
-#pragma region
-// ---- AST Declerations ---- //
-#pragma region
-class ProgramAST;
-class DeclAST;
-
-class ParamAST;
-class FuncDeclAST;
-class FuncCallAST;
-
-class VariableAST;
-class VariableDeclAST;
-class VariableAssignmentAST;
-
-class StmtAST;
-class BlockAST;
-class IfAST;
-class WhileAST;
-class ReturnAST;
-
-class ExprAST;
-class BinaryExprAST;
-class UnaryExprAST;
-
-class IntegerAST;
-class FloatAST;
-class BoolAST;
-class VoidAST;
-
-class StmtAST : public ASTnode{};
-class ExprAST : public StmtAST{};
-
-#pragma endregion
-// ---- AST Declerations ---- //
-// ----- Function Declerations Start ----- //
-#pragma region
-static void Arg_List_Prime();
-static std::vector<std::unique_ptr<ExprAST>> Arg_List();
-static std::vector<std::unique_ptr<ExprAST>> Args();
-static void Arg_List_Prime(std::vector<std::unique_ptr<ExprAST>> &args);
-static std::vector<std::unique_ptr<ExprAST>> Arg_List();
-static std::vector<std::unique_ptr<ExprAST>> Args();
-static std::unique_ptr<ExprAST> Rval_Term();
-static std::vector<std::unique_ptr<ExprAST>> Rval_Ident_Prime();
-static std::unique_ptr<ExprAST> Rval_Ident();
-static std::unique_ptr<ExprAST> Rval_Par();
-static std::unique_ptr<ExprAST> Rval_Neg();
-static std::unique_ptr<ExprAST> Rval_Mul_Prime(std::unique_ptr<ExprAST> LHS);
-static std::unique_ptr<ExprAST> Rval_Mul();
-static std::unique_ptr<ExprAST> Rval_Add_Prime(std::unique_ptr<ExprAST> LHS);
-static std::unique_ptr<ExprAST> Rval_Add();
-static std::unique_ptr<ExprAST> Rval_Cmp_Prime(std::unique_ptr<ExprAST> LHS);
-static std::unique_ptr<ExprAST> Rval_Cmp();
-static std::unique_ptr<ExprAST> Rval_Eq_Prime(std::unique_ptr<ExprAST> LHS);
-static std::unique_ptr<ExprAST> Rval_Eq();
-static std::unique_ptr<ExprAST> Rval_And_Prime(std::unique_ptr<ExprAST> LHS);
-static std::unique_ptr<ExprAST> Rval_And();
-static std::unique_ptr<ExprAST> Rval_Or_Prime(std::unique_ptr<ExprAST> LHS);
-static std::unique_ptr<ExprAST> Rval_Or();
-static std::unique_ptr<ExprAST> Expr();
-static std::unique_ptr<ReturnAST> Return_Stmt_Prime();
-static std::unique_ptr<ReturnAST> Return_Stmt();
-static std::unique_ptr<BlockAST> Else_Stmt();
-static std::unique_ptr<IfAST> If_Stmt();
-static std::unique_ptr<WhileAST> While_Stmt();
-static std::unique_ptr<ExprAST> Expr_Stmt();
-static std::unique_ptr<StmtAST> Stmt();
-static void Stmt_List(std::vector<std::unique_ptr<StmtAST>> &stmt_list);
-static std::unique_ptr<VariableDeclAST> Local_Decl();
-static void Local_Decls(std::vector<std::unique_ptr<VariableDeclAST>> &variable_decls);
-static std::unique_ptr<BlockAST> Block();
-static std::unique_ptr<ParamAST> Param();
-static void Param_List_Prime(std::vector<std::unique_ptr<ParamAST>> &param_list);
-static std::vector<std::unique_ptr<ParamAST>> Param_List();
-static std::vector<std::unique_ptr<ParamAST>> Params();
-static void Decl_Prime(std::unique_ptr<FuncDeclAST> &func_decl, std::unique_ptr<VariableDeclAST> &var_decl, VAR_TYPE type, const std::string &ident);
-static std::unique_ptr<DeclAST> Decl();
-static void Decl_List_Prime(std::unique_ptr<DeclAST> &decl_list);
-static std::vector<std::unique_ptr<DeclAST>> Decl_List();
-static std::unique_ptr<FuncDeclAST> Extern();
-static void Extern_List_Prime(std::vector<std::unique_ptr<FuncDeclAST>> &extern_list);
-static std::vector<std::unique_ptr<FuncDeclAST>> Extern_List();
-static std::unique_ptr<ProgramAST> Program();
-#pragma endregion
-// ----- Function Declerations End ----- //
-
-// ----- Helper Functions ------ //
-#pragma region
-/**
- * @brief Checks if the current token is the same as the expected token. If not an error is thrown
- *
- * @param expectedTokenType
- * @param errMessage
- * @param prodRule
- */
-static void Match(TOKEN_TYPE expectedTokenType, string errMessage, const char *prodRule = __builtin_FUNCTION())
-{
-	if (CurTok.type != expectedTokenType)
-	{
-		throw ParseException("Invalid Token Error: " + errMessage);
-	}
-	getNextToken();
-}
-
-/**
- * @brief Checks if the current token is a valid token for adding a layer of presedence
- *
- * @param type
- * @return true If the next token is valid token for adding a layer of presedence
- * @return false Otherwise
- */
-static bool ValidPresedenceLayer(int type)
-{
-	bool addlayer;
-	switch (type)
-	{
-	case BOOL_LIT:
-	case FLOAT_LIT:
-	case INT_LIT:
-	case LPAR:
-	case NOT:
-	case MINUS:
-	case IDENT:
-		addlayer = true;
-		break;
-	default:
-		addlayer = false;
-		break;
-	}
-	return addlayer;
-}
-
-/**
- * @brief Checks if the current token's type is one of the valid types
- *
- * @return true
- * @return false
- */
-static bool ValidType()
-{
-	switch (CurTok.type)
-	{
-	case BOOL_TOK:
-	case FLOAT_TOK:
-	case INT_TOK:
-		return true;
-	default:
-		return false;
-	}
-}
-
-/**
- * @brief Checks if the current token is a valid token for starting an expression 
- * 
- * @return true 
- * @return false 
- */
-static bool ValidExprStart()
-{
-	switch (CurTok.type)
-	{
-	case BOOL_LIT:
-	case FLOAT_LIT:
-	case INT_LIT:
-	case LPAR:
-	case IDENT:
-	case NOT:
-	case MINUS:
-		return true;
-	default:
-		return false;
-	}
-}
 
 
-#pragma endregion
-// ----- Helper Functions End ------ //
-#pragma endregion
+
 //===-------------------- Forward Declerations -------------------------------===//
 
 
@@ -644,35 +469,7 @@ enum VAR_TYPE
 	BOOL_TYPE
 };
 
-/**
- * @brief Get the Ident And Match object
- *
- * @param CurTok
- * @return TOKEN Token of identifer if no error, otherwise an error is a thrown
- */
-static TOKEN GetIdentAndMatch()
-{
-	TOKEN prev_token = CurTok;
-	Match(IDENT, "Expected identifer token. ");
-	return prev_token;
-}
 
-/**
- * @brief Looks at the next token in the queue without removing it
- *
- * @return TOKEN Next token in the queue
- */
-static TOKEN PeekToken()
-{
-	TOKEN tmpToken = CurTok;
-
-	TOKEN nextToken = getNextToken();
-	putBackToken(nextToken);
-
-	CurTok = tmpToken;
-
-	return nextToken;
-}
 
 /**
  * @brief Converts type enum to string 
@@ -698,7 +495,9 @@ const std::string TypeToStr(VAR_TYPE type)
 }
 
 /**
- * @brief Genereic function to print out a vector of ASTnodes
+ * @brief Generic function to print a vector of ast nodes 
+ * 
+ *
  * 
  * @tparam T Generic type of ASTnode
  * @param NodeVec The vector of nodes to print out 
@@ -714,6 +513,40 @@ static void PrintVectorAST(std::vector<std::unique_ptr<T>> NodeVec, const std::s
 		NodeVec[i]->to_string(prefix + (isLeft ? "│   " : "    "), "", (i != NodeVec.size() - 1) || extraCon);
 	}
 }
+
+// ---- AST Declerations ---- //
+#pragma region
+class ProgramAST;
+class DeclAST;
+
+class ParamAST;
+class FuncDeclAST;
+class FuncCallAST;
+
+class VariableAST;
+class VariableDeclAST;
+class VariableAssignmentAST;
+
+class StmtAST;
+class BlockAST;
+class IfAST;
+class WhileAST;
+class ReturnAST;
+
+class ExprAST;
+class BinaryExprAST;
+class UnaryExprAST;
+
+class IntegerAST;
+class FloatAST;
+class BoolAST;
+class VoidAST;
+
+class StmtAST : public ASTnode{};
+class ExprAST : public StmtAST{};
+
+#pragma endregion
+// ---- AST Declerations ---- //
 
 /// =================================== !! Variable's START !! ================================================ ///
 #pragma region
@@ -1145,6 +978,181 @@ public:
 		return Err.c_str();
 	}
 };
+
+// ----- Function Declerations Start ----- //
+#pragma region
+static void Arg_List_Prime();
+static std::vector<std::unique_ptr<ExprAST>> Arg_List();
+static std::vector<std::unique_ptr<ExprAST>> Args();
+static void Arg_List_Prime(std::vector<std::unique_ptr<ExprAST>> &args);
+static std::vector<std::unique_ptr<ExprAST>> Arg_List();
+static std::vector<std::unique_ptr<ExprAST>> Args();
+static std::unique_ptr<ExprAST> Rval_Term();
+static std::vector<std::unique_ptr<ExprAST>> Rval_Ident_Prime();
+static std::unique_ptr<ExprAST> Rval_Ident();
+static std::unique_ptr<ExprAST> Rval_Par();
+static std::unique_ptr<ExprAST> Rval_Neg();
+static std::unique_ptr<ExprAST> Rval_Mul_Prime(std::unique_ptr<ExprAST> LHS);
+static std::unique_ptr<ExprAST> Rval_Mul();
+static std::unique_ptr<ExprAST> Rval_Add_Prime(std::unique_ptr<ExprAST> LHS);
+static std::unique_ptr<ExprAST> Rval_Add();
+static std::unique_ptr<ExprAST> Rval_Cmp_Prime(std::unique_ptr<ExprAST> LHS);
+static std::unique_ptr<ExprAST> Rval_Cmp();
+static std::unique_ptr<ExprAST> Rval_Eq_Prime(std::unique_ptr<ExprAST> LHS);
+static std::unique_ptr<ExprAST> Rval_Eq();
+static std::unique_ptr<ExprAST> Rval_And_Prime(std::unique_ptr<ExprAST> LHS);
+static std::unique_ptr<ExprAST> Rval_And();
+static std::unique_ptr<ExprAST> Rval_Or_Prime(std::unique_ptr<ExprAST> LHS);
+static std::unique_ptr<ExprAST> Rval_Or();
+static std::unique_ptr<ExprAST> Expr();
+static std::unique_ptr<ReturnAST> Return_Stmt_Prime();
+static std::unique_ptr<ReturnAST> Return_Stmt();
+static std::unique_ptr<BlockAST> Else_Stmt();
+static std::unique_ptr<IfAST> If_Stmt();
+static std::unique_ptr<WhileAST> While_Stmt();
+static std::unique_ptr<ExprAST> Expr_Stmt();
+static std::unique_ptr<StmtAST> Stmt();
+static void Stmt_List(std::vector<std::unique_ptr<StmtAST>> &stmt_list);
+static std::unique_ptr<VariableDeclAST> Local_Decl();
+static void Local_Decls(std::vector<std::unique_ptr<VariableDeclAST>> &variable_decls);
+static std::unique_ptr<BlockAST> Block();
+static std::unique_ptr<ParamAST> Param();
+static void Param_List_Prime(std::vector<std::unique_ptr<ParamAST>> &param_list);
+static std::vector<std::unique_ptr<ParamAST>> Param_List();
+static std::vector<std::unique_ptr<ParamAST>> Params();
+static VAR_TYPE Var_Type();
+static VAR_TYPE Type_Spec();
+static void Decl_Prime(std::unique_ptr<FuncDeclAST> &func_decl, std::unique_ptr<VariableDeclAST> &var_decl, VAR_TYPE type, const std::string &ident);
+static std::unique_ptr<DeclAST> Decl();
+static void Decl_List_Prime(std::unique_ptr<DeclAST> &decl_list);
+static std::vector<std::unique_ptr<DeclAST>> Decl_List();
+static std::unique_ptr<FuncDeclAST> Extern();
+static void Extern_List_Prime(std::vector<std::unique_ptr<FuncDeclAST>> &extern_list);
+static std::vector<std::unique_ptr<FuncDeclAST>> Extern_List();
+static std::unique_ptr<ProgramAST> Program();
+#pragma endregion
+// ----- Function Declerations End ----- //
+
+// ----- Helper Functions ------ //
+#pragma region
+/**
+ * @brief Checks if the current token is the same as the expected token. If not an error is thrown
+ *
+ * @param expectedTokenType
+ * @param errMessage
+ * @param prodRule
+ */
+static void Match(TOKEN_TYPE expectedTokenType, string errMessage, const char *prodRule = __builtin_FUNCTION())
+{
+	if (CurTok.type != expectedTokenType)
+	{
+		throw ParseException("Invalid Token Error: " + errMessage);
+	}
+	getNextToken();
+}
+
+/**
+ * @brief Get the Ident And Match object
+ *
+ * @param CurTok
+ * @return TOKEN Token of identifer if no error, otherwise an error is a thrown
+ */
+static TOKEN GetIdentAndMatch()
+{
+	TOKEN prev_token = CurTok;
+	Match(IDENT, "Expected identifer token. ");
+	return prev_token;
+}
+
+/**
+ * @brief Looks at the next token in the queue without removing it
+ *
+ * @return TOKEN Next token in the queue
+ */
+static TOKEN PeekToken()
+{
+	TOKEN tmpToken = CurTok;
+
+	TOKEN nextToken = getNextToken();
+	putBackToken(nextToken);
+
+	CurTok = tmpToken;
+
+	return nextToken;
+}
+
+/**
+ * @brief Checks if the current token is a valid token for adding a layer of presedence
+ *
+ * @param type
+ * @return true If the next token is valid token for adding a layer of presedence
+ * @return false Otherwise
+ */
+static bool ValidPresedenceLayer(int type)
+{
+	bool addlayer;
+	switch (type)
+	{
+	case BOOL_LIT:
+	case FLOAT_LIT:
+	case INT_LIT:
+	case LPAR:
+	case NOT:
+	case MINUS:
+	case IDENT:
+		addlayer = true;
+		break;
+	default:
+		addlayer = false;
+		break;
+	}
+	return addlayer;
+}
+
+/**
+ * @brief Checks if the current token's type is one of the valid types
+ *
+ * @return true
+ * @return false
+ */
+static bool ValidType()
+{
+	switch (CurTok.type)
+	{
+	case BOOL_TOK:
+	case FLOAT_TOK:
+	case INT_TOK:
+		return true;
+	default:
+		return false;
+	}
+}
+
+/**
+ * @brief Checks if the current token is a valid token for starting an expression 
+ * 
+ * @return true 
+ * @return false 
+ */
+static bool ValidExprStart()
+{
+	switch (CurTok.type)
+	{
+	case BOOL_LIT:
+	case FLOAT_LIT:
+	case INT_LIT:
+	case LPAR:
+	case IDENT:
+	case NOT:
+	case MINUS:
+		return true;
+	default:
+		return false;
+	}
+}
+
+#pragma endregion
+// ------- Helper Functions End ------- //
 
 // arg_list_prime ::= "," expr arg_list_prime | epsilon
 static void Arg_List_Prime(std::vector<std::unique_ptr<ExprAST>> &args)
