@@ -2507,6 +2507,13 @@ static std::unique_ptr<ProgramAST> Program()
 	return std::make_unique<ProgramAST>(std::move(extern_list), std::move(decl_list));
 }
 
+/**
+ * @brief Attempts to create a Root Program AST Node 
+ * Any syntax errors are thrown and caught and reported,
+ * 
+ * If no syntax errors exist, the AST Printer is ran and prints the AST for the given program 
+ * 
+ */
 static void parser()
 {
 	getNextToken();
@@ -2520,6 +2527,7 @@ static void parser()
 			throw ParseException("Invalid Token Error: \nExpected: end_of_file. ");
 		}
 
+		//AST Printer
 		P->to_string("", "Program", false);
 	}
 	catch (const exception &e)
@@ -2536,16 +2544,6 @@ static void parser()
 static LLVMContext TheContext;
 static IRBuilder<> Builder(TheContext);
 static std::unique_ptr<Module> TheModule;
-
-//===----------------------------------------------------------------------===//
-// AST Printer
-//===----------------------------------------------------------------------===//
-
-// inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
-// 																		 const ASTnode &ast) {
-// 	os << ast.to_string();
-// 	return os;
-// }
 
 //===----------------------------------------------------------------------===//
 // Main driver code.
