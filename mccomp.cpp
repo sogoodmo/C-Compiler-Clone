@@ -60,12 +60,14 @@ static std::map<std::string, llvm::GlobalVariable*> GlobalVariables;
 class Warning
 {
 	string Err;
+	int lineno;
+	int colno;
 
 public:
-	Warning(string err) : Err(err) {}
+	Warning(string err, int line, int col) : Err(err), lineno(line), colno(col) {}
 
 	std::string to_string(){
-		return Err; 
+		return Err + " On Line: " + std::to_string(lineno) + " Col: " + std::to_string(colno); 
 	}
 };
 
@@ -606,45 +608,49 @@ static AllocaInst *CreateEntryBlockAlloca(Function *TheFunction, const std::stri
  * @param val Value 
  * @param alloca Alloca to update
  */
-static llvm::Value* ImplicitCasting(llvm::Value *val,  llvm::Type *newType){
+static llvm::Value* ImplicitCasting(llvm::Value *val,  llvm::Type *newType, TOKEN tokInfo){
 	llvm::Type *oldType = val->getType();
 	
 	//Float -> Int Conversion - Precision Loss 
 	if (oldType->isFloatTy() && newType->isIntegerTy(32))
 	{
-		Warnings.push_back(Warning("Warning: Implict conversion from Float to Int32. May lose precision"));
+		Warnings.push_back(Warning("Warning: Implict conversion from Float to Int32. May lose precision", tokInfo.lineNo, tokInfo.columnNo));
 		return Builder.CreateIntCast(val, newType, false);
 	} 
 	
 	//Float -> Bool Conversion - Precision Loss 
 	if (oldType->isFloatTy() && newType->isIntegerTy(1)) 
 	{
-		Warnings.push_back(Warning("Warning: Implict conversion from Bool to Float. May lose precision"));
+		Warnings.push_back(Warning("Warning: Implict conversion from Bool to Float. May lose precision", tokInfo.lineNo, tokInfo.columnNo));
 		return Builder.CreateFCmpONE(val, ConstantFP::get(TheContext, APFloat(0.0f)));
 	}
 	
 	//Int -> Bool Conversion - Precision Loss 
 	if (oldType->isIntegerTy(32) && newType->isIntegerTy(1))
 	{
-		Warnings.push_back(Warning("Warning: Implict conversion from Float to Int32. May lose precision"));
+		Warnings.push_back(Warning("Warning: Implict conversion from Float to Int32. May lose precision", tokInfo.lineNo, tokInfo.columnNo));
 		return Builder.CreateICmpNE(val, ConstantInt::get(Type::getInt32Ty(TheContext), 0));
 	}
 	
 	//Int -> Float Conversion - No Precision Loss 
 	if (oldType->isIntegerTy(32) && newType->isFloatTy()) 
 	{
+		Warnings.push_back(Warning("Warning: Implict conversion from Int32 to Float. May result in unexpected behaivour", tokInfo.lineNo, tokInfo.columnNo));
 		return Builder.CreateUIToFP(val, newType);
 	}
 
 	//Bool -> Float Conversion - No Precision Loss 
 	if (oldType->isIntegerTy(1) && newType->isFloatTy()) 
 	{
+		Warnings.push_back(Warning("Warning: Implict conversion from Bool to Float. May result in unexpected behaivour", tokInfo.lineNo, tokInfo.columnNo));
 		return Builder.CreateUIToFP(val, newType);
 	}
 
 	//Bool -> Int Conversion - No Precision Loss 
 	if (oldType->isIntegerTy(1) && newType->isIntegerTy(32)) 
 	{
+
+		Warnings.push_back(Warning("Warning: Implict conversion from Bool to Int32. May result in unexpected behaivour", tokInfo.lineNo, tokInfo.columnNo));
 		return Builder.CreateIntCast(val, newType, false);
 	}
 
@@ -824,7 +830,7 @@ public:
 			if (mapContainsKey(ScopedNamedValues[i], Ident.lexeme)){
 				AllocaInst *alloca = ScopedNamedValues[i].at(Ident.lexeme);
 				
-				llvm::Value *CastedValue = ImplicitCasting(E, alloca->getAllocatedType());
+				llvm::Value *CastedValue = ImplicitCasting(E, alloca->getAllocatedType(), Ident);
 
 				Builder.CreateStore(CastedValue, alloca);
 				ScopedNamedValues[i][Ident.lexeme] = alloca;
@@ -835,7 +841,7 @@ public:
 		if (mapContainsKey(GlobalVariables, Ident.lexeme)){
 			GlobalVariable *alloca = GlobalVariables.at(Ident.lexeme);
 
-			llvm::Value *CastedValue = ImplicitCasting(E, alloca->getValueType());
+			llvm::Value *CastedValue = ImplicitCasting(E, alloca->getValueType(), Ident);
 
 			Builder.CreateStore(CastedValue, alloca);
 			GlobalVariables[Ident.lexeme] = alloca;
@@ -3021,7 +3027,7 @@ int main(int argc, char **argv)
 		std::cout << "Warnings: " << std::endl; 
 		int warningCnt = 0;
 		for (auto &Warn : Warnings){
-			std::cout << std::to_string(warningCnt) << ": " << Warn.to_string() << std::endl;
+			std::cout << std::to_string(warningCnt) << ": " << Warn.to_string() << "On Line: " << "<< std::endl;
 		}
 	}
 
