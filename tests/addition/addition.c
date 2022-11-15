@@ -10,20 +10,16 @@ int int_test;
 
 int test_func(float n, float m)
 {
-	bool local_bool_test;
-	float local_float_test;
-	int local_int_test;
-	
-	no_arg();
+	bool local_bool;
+	int local_int;
+	bool lol; 
+	local_bool = true + 1;
+	local_int = true + 1; 
+	lol = true + true;
+}
 
-	// if (true){
-	// 	int x;
-	// } else {
-	// 	int y;
-	// }
-
-
-
+	// float local_float_test;
+	// int local_int_test;
 	// int add;
 	// int sub;
 	// float div;
@@ -32,7 +28,17 @@ int test_func(float n, float m)
 	// bool neg;
 	// bool and;
 	// bool or ;
+	
+	
+	// local_float_test = 10.5 + 23.5;
+	// local_bool_test = (3+5) < 19.3; 
 
+	// if (3 + 5 < 19.3)
+	// {
+	// 	bool_arg(true);
+	// } else {
+	// 	float_arg(1.1);
+	// }
 
 
 	// add = 1 + 2;
@@ -46,15 +52,16 @@ int test_func(float n, float m)
 	// and = 1 && 2;
 	// or = 1 || 2;
 
-	if (and == 1)
-	{
-		no_arg();
-	}
 
-	while (mod == 1)
-	{
-		no_arg();
-	}
+	// if (and == 1)
+	// {
+	// 	no_arg();
+	// }
 
-	return add;
-}
+	// while (mod == 1)
+	// {
+	// 	no_arg();
+	// }
+
+	// return add;
+// }

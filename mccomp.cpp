@@ -35,7 +35,6 @@
 #include <utility>
 #include <vector>
 
-
 using namespace llvm;
 using namespace llvm::sys;
 using namespace std;
@@ -45,19 +44,18 @@ static IRBuilder<> Builder(TheContext);
 static std::unique_ptr<Module> TheModule;
 
 /**
- * Contains a vector of maps- Where the index of the unordered_map indicates it's level of scope 
- * 
- * A block may access variables in a scope prior to it in the array, but not after it.  
- * 
- * If a variable is defined multiple times 
+ * Contains a vector of maps- Where the index of the unordered_map indicates it's level of scope
+ *
+ * A block may access variables in a scope prior to it in the array, but not after it.
+ *
+ * If a variable is defined multiple times
  */
-static std::vector<std::unordered_map<std::string, llvm::AllocaInst*>> ScopedNamedValues;
-static std::unordered_map<std::string, llvm::GlobalVariable*> GlobalVariables;
-
+static std::vector<std::unordered_map<std::string, llvm::AllocaInst *>> ScopedNamedValues;
+static std::unordered_map<std::string, llvm::GlobalVariable *> GlobalVariables;
 
 /**
- * Class to store warnings, but not crash program 
-*/
+ * Class to store warnings, but not crash program
+ */
 class Warning
 {
 	string Err;
@@ -67,17 +65,17 @@ class Warning
 public:
 	Warning(string err, int line, int col) : Err(err), lineno(line), colno(col) {}
 
-	std::string to_string(){
-		return Err + " On Line: " + std::to_string(lineno) + " Col: " + std::to_string(colno); 
+	std::string to_string()
+	{
+		return Err + " On Line: " + std::to_string(lineno) + " Col: " + std::to_string(colno);
 	}
 };
 
-static std::vector<Warning> Warnings;  
-
+static std::vector<Warning> Warnings;
 
 /**
- * @brief Class for handling semenatic errors 
- * 
+ * @brief Class for handling semenatic errors
+ *
  */
 class SemanticException : public exception
 {
@@ -90,7 +88,7 @@ public:
 
 	virtual const char *what() const throw()
 	{
-		static std::string errMessage(Err + " On Line: " + std::to_string(line) + " Col: " + std::to_string(col));
+		static std::string errMessage("Semantic Error: " + Err + " On Line: " + std::to_string(line) + " Col: " + std::to_string(col));
 
 		return errMessage.c_str();
 	}
@@ -114,32 +112,35 @@ public:
 };
 
 template <typename K, typename V>
-bool mapContainsKey(std::unordered_map<K, V>& map, K key)
+bool mapContainsKey(std::unordered_map<K, V> &map, K key)
 {
-  if (map.find(key) == map.end()) return false;
-  return true;
+	if (map.find(key) == map.end())
+		return false;
+	return true;
 }
 
 /**
  * @brief Checks every level of scope for a decleration of the given variable,
  * If found, it updates it's alloca to be one of the new value
- * 
- * @param newVal New value of variable 
- * @param ident Name of variable 
+ *
+ * @param newVal New value of variable
+ * @param ident Name of variable
  * @param scopeIdx The depth of scope the variable was first assigned
  */
-void UpdateParentScopeValues(llvm::Value *newVal, std::string ident, int scopeIdx){
+void UpdateParentScopeValues(llvm::Value *newVal, std::string ident, int scopeIdx)
+{
 
-	for (int i=0; i<scopeIdx; i++){
-		if (mapContainsKey(ScopedNamedValues[i], ident)){
+	for (int i = 0; i < scopeIdx; i++)
+	{
+		if (mapContainsKey(ScopedNamedValues[i], ident))
+		{
 			llvm::AllocaInst *alloca = ScopedNamedValues[i].at(ident);
-			
+
 			Builder.CreateStore(newVal, alloca);
 
 			ScopedNamedValues[i][ident] = alloca;
 		}
 	}
-
 }
 
 FILE *pFile;
@@ -148,7 +149,7 @@ FILE *pFile;
 // Lexer
 //===----------------------------------------------------------------------===//
 
-#pragma region 
+#pragma region
 
 // The lexer returns one of these for known things.
 enum TOKEN_TYPE
@@ -562,8 +563,6 @@ public:
 	virtual void to_string(const std::string &prefix, const std::string &nodeStr, bool isLeft) const {};
 };
 
-
-
 enum VAR_TYPE
 {
 	VOID_TYPE = 0,
@@ -572,15 +571,14 @@ enum VAR_TYPE
 	BOOL_TYPE
 };
 
-
-
 /**
- * @brief Returns the matching llvm type for the type passed in. 
- * 
- * @param type The type of the variable 
- * @return const llvm::Type The LLVM Type of the variable passed 
+ * @brief Returns the matching llvm type for the type passed in.
+ *
+ * @param type The type of the variable
+ * @return const llvm::Type The LLVM Type of the variable passed
  */
-llvm::Type* TypeToLLVM(VAR_TYPE type, TOKEN tokInfo){
+llvm::Type *TypeToLLVM(VAR_TYPE type, TOKEN tokInfo)
+{
 
 	switch (type)
 	{
@@ -593,15 +591,40 @@ llvm::Type* TypeToLLVM(VAR_TYPE type, TOKEN tokInfo){
 	case BOOL_TYPE:
 		return IntegerType::getInt1Ty(TheContext);
 	default:
-		throw SemanticException("Type Error:\nExpected one of ['int', 'void', 'bool', 'float']", tokInfo.lineNo, tokInfo.columnNo);
+		throw SemanticException("Unexpected Type. \nExpected one of ['int', 'void', 'bool', 'float']", tokInfo.lineNo, tokInfo.columnNo);
 	}
 }
 
 /**
- * @brief Converts type enum to string 
- * 
- * @param type The type to convert 
- * @return const std::string The string of the converted type 
+ * @brief Get the Highest Precision Type object
+ *
+ * @param t1 First Type
+ * @param t2 Second Type
+ * @return llvm::Type* Returns the type with the higher precision of the 2
+ */
+llvm::Type *GetHighestPrecisionType(llvm::Type *t1, llvm::Type *t2)
+{
+	if (t1->isFloatTy() || t2->isFloatTy())
+	{
+		return Type::getFloatTy(TheContext);
+	}
+	else if (t1->isIntegerTy(32) || t2->isIntegerTy(32))
+	{
+		return IntegerType::getInt32Ty(TheContext);
+	}
+	else if (t2->isIntegerTy(1) || t2->isIntegerTy(1))
+	{
+		return IntegerType::getInt1Ty(TheContext);
+	}
+
+	throw SemanticException("Unexpected Type. ", -1, -1);
+}
+
+/**
+ * @brief Converts type enum to string
+ *
+ * @param type The type to convert
+ * @return const std::string The string of the converted type
  */
 const std::string TypeToStr(VAR_TYPE type)
 {
@@ -620,104 +643,112 @@ const std::string TypeToStr(VAR_TYPE type)
 	}
 }
 
-// Create an alloca instruction in the entry block of the function.  
+// Create an alloca instruction in the entry block of the function.
 // This is used for mutable variables etc.
-static llvm::AllocaInst *CreateEntryBlockAlloca(Function *TheFunction, const std::string &VarName, llvm::Type *type) {
-  IRBuilder<> TmpB(&TheFunction->getEntryBlock(), TheFunction->getEntryBlock().begin());
-  return TmpB.CreateAlloca(type, 0, VarName.c_str());
+static llvm::AllocaInst *CreateEntryBlockAlloca(Function *TheFunction, const std::string &VarName, llvm::Type *type)
+{
+	IRBuilder<> TmpB(&TheFunction->getEntryBlock(), TheFunction->getEntryBlock().begin());
+	return TmpB.CreateAlloca(type, 0, VarName.c_str());
 }
 
-
 /**
- * @brief Convert the expression from it's original type to a boolean type 
- * 
+ * @brief Convert the expression from it's original type to a boolean type
+ *
  * @param val Value of the expressiom
- * @param type Type of the value of the expression 
- * @return llvm::Value* 
+ * @param type Type of the value of the expression
+ * @return llvm::Value*
  */
-static llvm::Value *GetTypedCoerecedCondition(llvm::Value *val,  llvm::Type *type){
+static llvm::Value *GetTypedCoerecedCondition(llvm::Value *val, llvm::Type *type)
+{
 	if (type->isFloatTy())
 	{
 		return Builder.CreateFCmpONE(val, ConstantFP::get(TheContext, APFloat(0.0f)), "ifcond");
-	} 
+	}
 	else if (type->isIntegerTy(32))
 	{
-		return Builder.CreateICmpNE(val, ConstantInt::get(Type::getInt32Ty(TheContext), 0), "ifcond");
+		return Builder.CreateICmpNE(val, ConstantInt::get(Type::getInt32Ty(TheContext), true), "ifcond");
 	}
 	else if (type->isIntegerTy(1))
 	{
 		return Builder.CreateLogicalOr(val, ConstantInt::get(Type::getInt1Ty(TheContext), 0), "ifcond");
 	}
 
-	throw SemanticException("",-1,-1);
+	throw SemanticException("", -1, -1);
 }
 
 /**
  * @brief Adds warning to warning buffer if attempting to implicitly convert and may lose precision
  * Returns new value after conversion.
- * 
- * @param val Value 
+ *
+ * @param val Value
  * @param alloca Alloca to update
  */
-static llvm::Value *ImplicitCasting(llvm::Value *val,  llvm::Type *newType, TOKEN tokInfo){
+static llvm::Value *ImplicitCasting(llvm::Value *val, llvm::Type *newType, TOKEN tokInfo)
+{
 	llvm::Type *oldType = val->getType();
-	
-	
-	//Float -> Int Conversion - Precision Loss 
+
+	/**
+	 * If casting same types, no extra work needs to be done. Can just return given value
+	 */
+	if (oldType == newType)
+	{
+		return val;
+	}
+
+	// Float -> Int Conversion - Precision Loss
 	if (oldType->isFloatTy() && newType->isIntegerTy(32))
 	{
 		Warnings.push_back(Warning("Warning: Implict conversion from Float to Int32. May lose precision", tokInfo.lineNo, tokInfo.columnNo));
 		return Builder.CreateIntCast(val, newType, false, tokInfo.lexeme.c_str());
-	} 
-	
-	//Float -> Bool Conversion - Precision Loss 
-	if (oldType->isFloatTy() && newType->isIntegerTy(1)) 
+	}
+
+	// Float -> Bool Conversion - Precision Loss
+	if (oldType->isFloatTy() && newType->isIntegerTy(1))
 	{
 		Warnings.push_back(Warning("Warning: Implict conversion from Bool to Float. May lose precision", tokInfo.lineNo, tokInfo.columnNo));
 		return Builder.CreateFCmpONE(val, ConstantFP::get(TheContext, APFloat(0.0f)), tokInfo.lexeme.c_str());
 	}
-	
-	//Int -> Bool Conversion - Precision Loss 
+
+	// Int -> Bool Conversion - Precision Loss
 	if (oldType->isIntegerTy(32) && newType->isIntegerTy(1))
 	{
-		Warnings.push_back(Warning("Warning: Implict conversion from Float to Int32. May lose precision", tokInfo.lineNo, tokInfo.columnNo));
-		return Builder.CreateICmpNE(val, ConstantInt::get(Type::getInt32Ty(TheContext), 0), tokInfo.lexeme.c_str());
+		Warnings.push_back(Warning("Warning: Implict conversion from Int32 to Bool. May lose precision", tokInfo.lineNo, tokInfo.columnNo));
+		return Builder.CreateICmpNE(val, ConstantInt::get(Type::getInt32Ty(TheContext), true), tokInfo.lexeme.c_str());
 	}
-	
-	//Int -> Float Conversion - No Precision Loss 
-	if (oldType->isIntegerTy(32) && newType->isFloatTy()) 
+
+	// Int -> Float Conversion - No Precision Loss
+	if (oldType->isIntegerTy(32) && newType->isFloatTy())
 	{
 		Warnings.push_back(Warning("Warning: Implict conversion from Int32 to Float. May result in unexpected behaivour", tokInfo.lineNo, tokInfo.columnNo));
 		return Builder.CreateUIToFP(val, newType, tokInfo.lexeme.c_str());
 	}
 
-	//Bool -> Float Conversion - No Precision Loss 
-	if (oldType->isIntegerTy(1) && newType->isFloatTy()) 
+	// Bool -> Float Conversion - No Precision Loss
+	if (oldType->isIntegerTy(1) && newType->isFloatTy())
 	{
 		Warnings.push_back(Warning("Warning: Implict conversion from Bool to Float. May result in unexpected behaivour", tokInfo.lineNo, tokInfo.columnNo));
 		return Builder.CreateUIToFP(val, newType, tokInfo.lexeme.c_str());
 	}
 
-	//Bool -> Int Conversion - No Precision Loss 
-	if (oldType->isIntegerTy(1) && newType->isIntegerTy(32)) 
+	// Bool -> Int Conversion - No Precision Loss
+	if (oldType->isIntegerTy(1) && newType->isIntegerTy(32))
 	{
 
 		Warnings.push_back(Warning("Warning: Implict conversion from Bool to Int32. May result in unexpected behaivour", tokInfo.lineNo, tokInfo.columnNo));
 		return Builder.CreateIntCast(val, newType, false, tokInfo.lexeme.c_str());
 	}
 
-	throw SemanticException("Unexpected Type Error: Expected int, bool or float. ", tokInfo.lineNo, tokInfo.columnNo);
+	throw SemanticException("Unexpected Type. Expected int, bool or float. ", tokInfo.lineNo, tokInfo.columnNo);
 }
 
-
 // /**
-//  * @brief Generic function to print a vector of ast nodes 
-//  * 
+//  * @brief Generic function to print a vector of ast nodes
 //  *
-//  * 
+//  *
+//  *
 //  * @tparam T Generic type of ASTnode
-//  * @param NodeVec The vector of nodes to print out 
-//  * @param prefix The prefix of the vector 
+//  * @param NodeVec The vector of nodes to print out
+//  * @param prefix The prefix of the vector
 //  * @param isLeft Weather the vector was a left subtree
 //  * @param extraCon Any auxillary conditions to checking if an item is the right subtree
 //  */
@@ -756,12 +787,12 @@ class UnaryExprAST;
 class IntegerAST;
 class FloatAST;
 class BoolAST;
-class VoidAST;
 
-class StmtAST : public ASTnode{};
-class ExprAST : public StmtAST{
-	public:
-	virtual TOKEN getTok()  {};
+class StmtAST : public ASTnode
+{
+};
+class ExprAST : public StmtAST
+{
 };
 
 #pragma endregion
@@ -786,34 +817,59 @@ public:
 		std::cout << "Variable: " << Ident.lexeme << std::endl;
 	};
 
-	llvm::Value *codegen() override{
-		llvm::Value *V; 
+	/**
+	 * @brief Attempts to find referenced variable in any scope level higher or equal to (Or global scope finally)
+	 * If referenced variable not defined already- throw a warning and return a null value.
+	 *
+	 * @return llvm::Value* Value of referenced variable
+	 */
+	llvm::Value *codegen() override
+	{
+		llvm::Value *V;
 
 		// Look up the values from the scopes, stopping at the deepest layer of scope it finds
-		// If doesn't exist in any scope- try one more time in the global scope 
-		// If it doesn't exist in the scope, then it will throw an error. 
+		// If doesn't exist in any scope- try one more time in the global scope
+		// If it doesn't exist in the scope, then it will throw an error.
 
-		for (int i=ScopedNamedValues.size()-1; i > -1; i--){
-			if (mapContainsKey(ScopedNamedValues[i], Ident.lexeme)){
-				
+		for (int i = ScopedNamedValues.size() - 1; i > -1; i--)
+		{
+			if (mapContainsKey(ScopedNamedValues[i], Ident.lexeme))
+			{
+
 				llvm::AllocaInst *alloca = ScopedNamedValues[i].at(Ident.lexeme);
-				V = Builder.CreateLoad(alloca->getAllocatedType(), alloca, Ident.lexeme.c_str());
-				
+
+				if (alloca == nullptr)
+				{
+					Warnings.push_back(Warning("Warning: Referencing undefined variable. Using default value", Ident.lineNo, Ident.columnNo));
+					V = Builder.CreateLoad(alloca->getAllocatedType(), Constant::getNullValue(alloca->getAllocatedType()), Ident.lexeme.c_str());
+				}
+				else
+				{
+					V = Builder.CreateLoad(alloca->getAllocatedType(), alloca, Ident.lexeme.c_str());
+				}
+
 				return V;
 			}
 		}
 
-		if (mapContainsKey(GlobalVariables, Ident.lexeme)){
+		if (mapContainsKey(GlobalVariables, Ident.lexeme))
+		{
 			GlobalVariable *globalAlloca = GlobalVariables.at(Ident.lexeme);
-			V = Builder.CreateLoad(globalAlloca->getValueType(), globalAlloca, Ident.lexeme.c_str());
+
+			if (globalAlloca == nullptr)
+			{
+				Warnings.push_back(Warning("Warning: Referencing undefined global variable. Using default value", Ident.lineNo, Ident.columnNo));
+				V = Builder.CreateLoad(globalAlloca->getValueType(), Constant::getNullValue(globalAlloca->getValueType()), Ident.lexeme.c_str());
+			}
+			else
+			{
+				V = Builder.CreateLoad(globalAlloca->getValueType(), globalAlloca, Ident.lexeme.c_str());
+			}
+
 			return V;
-		} 
+		}
 
 		throw SemanticException("Undecleared variable referenced. Perhaps your variable is out of scope?", Ident.lineNo, Ident.columnNo);
-	};
-
-	virtual TOKEN getTok() override{
-		return Ident;
 	};
 };
 
@@ -836,33 +892,33 @@ public:
 	};
 
 	/**
-	 * @brief Adds a null decleration of the variable to the stack 
+	 * @brief Adds a null decleration of the variable to the stack
 	 * However, throws an error if the program is redeclaring a global variable in the global scope
 	 * It allows the program to redeclare a global variable within a local scope.
-	 * 
+	 *
 	 */
-	llvm::Value *codegen() override{
+	llvm::Value *codegen() override
+	{
 		bool isGlobal = ScopedNamedValues.size() == 0;
-		llvm::Type* llvmType = TypeToLLVM(Type, Ident);
-
+		llvm::Type *llvmType = TypeToLLVM(Type, Ident);
 
 		if (isGlobal)
 		{
-			if (mapContainsKey(GlobalVariables, Ident.lexeme)){
-				throw SemanticException("Cannot redefine global variable", Ident.lineNo, Ident.columnNo);
+			if (mapContainsKey(GlobalVariables, Ident.lexeme))
+			{
+				throw SemanticException("Cannot redefine global variable.", Ident.lineNo, Ident.columnNo);
 			}
 			auto G = new GlobalVariable(*(TheModule.get()), llvmType, false, GlobalValue::CommonLinkage, nullptr, Ident.lexeme);
-			GlobalVariables.insert({Ident.lexeme, G});		
+			GlobalVariables.insert({Ident.lexeme, G});
 		}
 		else
 		{
-			//nullptr may be replaced with `Constant::getNullValue(llvmType)`
-			auto A = Builder.CreateAlloca(llvmType, nullptr, Ident.lexeme); 		
+			auto A = Builder.CreateAlloca(llvmType, nullptr, Ident.lexeme);
 			ScopedNamedValues.back().insert({Ident.lexeme, A});
 		}
 
 		return nullptr;
-	}; 
+	};
 };
 
 class VariableAssignmentAST : public ExprAST
@@ -886,42 +942,45 @@ public:
 	};
 
 	/**
-	 * @brief Generates the value of the expression of our variable assignment 
-	 * Attempts to update the variable (Given it's defined), aswell as throwing warnings for any loss of precision from implicit type casting 
-	 * 
-	 * If it succesfully updates the value of the variable in it's current scope, 
+	 * @brief Generates the value of the expression of our variable assignment
+	 * Attempts to update the variable (Given it's defined), aswell as throwing warnings for any loss of precision from implicit type casting
+	 *
+	 * If it succesfully updates the value of the variable in it's current scope,
 	 * It must go through all of it's parents scope (and global scope) and update the value there if it exists
-	 * 
-	 * @return llvm::Value* Nullptr as assigning a variable doesn't return a value 
+	 *
+	 * @return llvm::Value* Nullptr as assigning a variable doesn't return a value
 	 */
-	llvm::Value *codegen() override{
+	llvm::Value *codegen() override
+	{
 		llvm::Value *E = Expr->codegen();
 		llvm::Value *CastedValue;
-		
-		for (int i=ScopedNamedValues.size()-1; i > -1; i--){
-			if (mapContainsKey(ScopedNamedValues[i], Ident.lexeme)){
-				
+
+		for (int i = ScopedNamedValues.size() - 1; i > -1; i--)
+		{
+			if (mapContainsKey(ScopedNamedValues[i], Ident.lexeme))
+			{
+
 				llvm::AllocaInst *alloca = ScopedNamedValues[i].at(Ident.lexeme);
-				
+
 				CastedValue = ImplicitCasting(E, alloca->getAllocatedType(), Ident);
 
 				Builder.CreateStore(CastedValue, alloca);
 				ScopedNamedValues[i][Ident.lexeme] = alloca;
 
 				// Finally check if this variable has been assigned a value higher up in scope
-				// And update the value of the variable at that scope 
+				// And update the value of the variable at that scope
 				UpdateParentScopeValues(CastedValue, Ident.lexeme, i);
 				return nullptr;
 			}
 		}
 
-
 		/**
 		 * If we're assining the value of a global variable
-		 * 
+		 *
 		 * It has no higher scope, so we don't need to propagate this change through higher scopes
 		 */
-		if (mapContainsKey(GlobalVariables, Ident.lexeme)){
+		if (mapContainsKey(GlobalVariables, Ident.lexeme))
+		{
 
 			GlobalVariable *alloca = GlobalVariables.at(Ident.lexeme);
 
@@ -931,13 +990,9 @@ public:
 			GlobalVariables[Ident.lexeme] = alloca;
 
 			return nullptr;
-		} 
+		}
 
 		throw SemanticException("Undecleared variable referenced. Perhaps your variable is out of scope?", Ident.lineNo, Ident.columnNo);
-	};
-
-	virtual TOKEN getTok() override{
-		return Ident;
 	};
 };
 #pragma endregion
@@ -974,24 +1029,27 @@ public:
 
 	/**
 	 * @brief When we enter a new scope, we must create a new unordered_map for strings to allocas
-	 * Then once this scope is exited, we destroy any variables that are now out of scope 
-	 *  
+	 * Then once this scope is exited, we destroy any variables that are now out of scope
+	 *
 	 */
-	llvm::Value *codegen() override{
-		
-		ScopedNamedValues.push_back(std::unordered_map<std::string, llvm::AllocaInst*>());
+	llvm::Value *codegen() override
+	{
 
-		for (auto &varDecl : VarDecls){
+		ScopedNamedValues.push_back(std::unordered_map<std::string, llvm::AllocaInst *>());
+
+		for (auto &varDecl : VarDecls)
+		{
 			varDecl->codegen();
 		}
 
-		for (auto &stmt : StmtList){
+		for (auto &stmt : StmtList)
+		{
 			stmt->codegen();
 		}
 
 		ScopedNamedValues.pop_back();
 		return nullptr;
-	}; 
+	};
 };
 
 class IfAST : public StmtAST
@@ -1025,11 +1083,19 @@ public:
 		}
 	};
 
-	llvm::Value *codegen() override{
+	/**
+	 * @brief Genereate the expression and coerce it into a boolean
+	 * Generate all the codeblocks for each path in the if statment,
+	 *
+	 * Set appropriate insert points and scopes for each basic block of the if statement
+	 *
+	 */
+	llvm::Value *codegen() override
+	{
 		Function *TheFunction = Builder.GetInsertBlock()->getParent();
 		llvm::Value *CondValue = ConditionExpr->codegen();
 		llvm::Type *CondType = CondValue->getType();
-		
+
 		CondValue = GetTypedCoerecedCondition(CondValue, CondType);
 
 		BasicBlock *TrueBB = BasicBlock::Create(TheContext, "then", TheFunction);
@@ -1039,7 +1105,7 @@ public:
 		Builder.CreateCondBr(CondValue, TrueBB, ElseBB);
 
 		// ----- True ------ //
-		ScopedNamedValues.push_back(std::unordered_map<std::string, llvm::AllocaInst*>());
+		ScopedNamedValues.push_back(std::unordered_map<std::string, llvm::AllocaInst *>());
 
 		Builder.SetInsertPoint(TrueBB);
 		TrueBlock->codegen();
@@ -1049,27 +1115,30 @@ public:
 
 		ScopedNamedValues.pop_back();
 		// ----- True ------ //
-		
-		// ----- False ------ //
-		ScopedNamedValues.push_back(std::unordered_map<std::string, llvm::AllocaInst*>());
-		
-		TheFunction->getBasicBlockList().push_back(ElseBB);
-		Builder.SetInsertPoint(ElseBB);
-		ElseBlock->codegen();
 
-		Builder.CreateBr(MergeBB);
-		ElseBB = Builder.GetInsertBlock();
+		if (ElseBlock != nullptr)
+		{
+			// ----- False ------ //
+			ScopedNamedValues.push_back(std::unordered_map<std::string, llvm::AllocaInst *>());
 
-		ScopedNamedValues.pop_back();
-		// ----- False ------ //
-		
+			TheFunction->getBasicBlockList().push_back(ElseBB);
+			Builder.SetInsertPoint(ElseBB);
+			ElseBlock->codegen();
+
+			Builder.CreateBr(MergeBB);
+			ElseBB = Builder.GetInsertBlock();
+
+			ScopedNamedValues.pop_back();
+			// ----- False ------ //
+		}
+
 		// ----- Continue ------ //
 		TheFunction->getBasicBlockList().push_back(MergeBB);
 		Builder.SetInsertPoint(MergeBB);
 		// ----- Continue ------ //
 
 		return nullptr;
-	}; 
+	};
 };
 
 class WhileAST : public StmtAST
@@ -1096,9 +1165,39 @@ public:
 		}
 	};
 
-	llvm::Value *codegen() override{
+	llvm::Value *codegen() override
+	{
+
+		Function *TheFunction = Builder.GetInsertBlock()->getParent();
+		llvm::Value *CondValue = ConditionExpr->codegen();
+		llvm::Type *CondType = CondValue->getType();
+
+		CondValue = GetTypedCoerecedCondition(CondValue, CondType);
+
+		BasicBlock *LoopBB = BasicBlock::Create(TheContext, "while", TheFunction);
+		BasicBlock *MergeBB = BasicBlock::Create(TheContext, "whilecont");
+
+		Builder.CreateCondBr(CondValue, LoopBB, MergeBB);
+
+		// ----- While True ------ //
+		ScopedNamedValues.push_back(std::unordered_map<std::string, llvm::AllocaInst *>());
+
+		Builder.SetInsertPoint(LoopBB);
+		LoopBlock->codegen();
+
+		Builder.CreateBr(MergeBB);
+		LoopBB = Builder.GetInsertBlock();
+
+		ScopedNamedValues.pop_back();
+		// ----- While True ------ //
+
+		// ----- Continue ------ //
+		TheFunction->getBasicBlockList().push_back(MergeBB);
+		Builder.SetInsertPoint(MergeBB);
+		// ----- Continue ------ //
+
 		return nullptr;
-	}; 
+	};
 };
 
 class ReturnAST : public StmtAST
@@ -1123,9 +1222,10 @@ public:
 		}
 	};
 
-	llvm::Value *codegen() override{
+	llvm::Value *codegen() override
+	{
 		return nullptr;
-	}; 
+	};
 };
 #pragma endregion
 /// =================================== !! Block & Stmts End !! ================================================ ///
@@ -1154,12 +1254,148 @@ public:
 		LHS->to_string(prefix + (isLeft ? "│   " : "    "), "", false);
 	};
 
-	llvm::Value *codegen() override{
-		return nullptr;
-	};
+	/**
+	 * @brief Generates the LHS, RHS of the binary expression
+	 * And depending on the highest level type of the hirearchy coerces the other type.
+	 *
+	 * Then generates the correct binary expression depending on the type.
+	 *
+	 * @return llvm::Value*
+	 */
+	llvm::Value *codegen() override
+	{
+		llvm::Value *BinExprVal;
+		llvm::Value *LHSVal = LHS->codegen();
+		llvm::Value *RHSVal = RHS->codegen();
+		llvm::Type *HighestPrecisionType = GetHighestPrecisionType(LHSVal->getType(), RHSVal->getType());
+		llvm::Value *CastedLHS;
+		llvm::Value *CastedRHS;
 
-	virtual TOKEN getTok() override{
-		return Op;
+		/**
+		 * AND, OR, EQ, NEQ, GT, GE, LT, LE - We must cast both types to bools. Regardless of what they already are
+		 *
+		 * Correctly coerce the type of the RHS and LHS
+		 *
+		 */
+		switch (Op.type)
+		{
+		case AND:
+		case OR:
+		case EQ:
+		case NE:
+		case LE:
+		case LT:
+		case GE:
+		case GT:
+			CastedLHS = ImplicitCasting(LHSVal, IntegerType::getInt1Ty(TheContext), Op);
+			CastedRHS = ImplicitCasting(RHSVal, IntegerType::getInt1Ty(TheContext), Op);
+			break;
+		case PLUS:
+		case MINUS:
+		case ASTERIX:
+		case DIV:
+		case MOD:
+			CastedLHS = ImplicitCasting(LHSVal, HighestPrecisionType, Op);
+			CastedRHS = ImplicitCasting(RHSVal, HighestPrecisionType, Op);
+			break;
+		default:
+			throw SemanticException("Invalid Binary Operator", Op.lineNo, Op.columnNo);
+		}
+
+		switch (Op.type)
+		{
+		case PLUS:
+			if (HighestPrecisionType->isFloatTy())
+			{
+				BinExprVal = Builder.CreateFAdd(CastedLHS, CastedRHS, "addtmp");
+			}
+			else
+			{
+				BinExprVal = Builder.CreateAdd(CastedLHS, CastedRHS, "addtmp");
+			}
+			break;
+
+		case MINUS:
+			if (HighestPrecisionType->isFloatTy())
+			{
+				BinExprVal = Builder.CreateFSub(CastedLHS, CastedRHS, "addtmp");
+			}
+			else
+			{
+				BinExprVal = Builder.CreateSub(CastedLHS, CastedRHS, "subtmp");
+			}
+			break;
+
+		case ASTERIX:
+			if (HighestPrecisionType->isFloatTy())
+			{
+				BinExprVal = Builder.CreateFMul(CastedLHS, CastedRHS, "multmp");
+			}
+			else
+			{
+				BinExprVal = Builder.CreateMul(CastedLHS, CastedRHS, "multmp");
+			}
+			break;
+
+		case DIV:
+			if (HighestPrecisionType->isFloatTy())
+			{
+				BinExprVal = Builder.CreateFDiv(CastedLHS, CastedRHS, "divtmp");
+			}
+			else if (HighestPrecisionType->isIntegerTy(1))
+			{
+				BinExprVal = Builder.CreateUDiv(CastedLHS, CastedRHS, "divtmp");
+			}
+			else if (HighestPrecisionType->isIntegerTy(32))
+			{
+				BinExprVal = Builder.CreateSDiv(CastedLHS, CastedRHS, "divtmp");
+			}
+
+			break;
+		case MOD:
+			if (HighestPrecisionType->isFloatTy())
+			{
+				BinExprVal = Builder.CreateFRem(CastedLHS, CastedRHS, "modtmp");
+			}
+			else if (HighestPrecisionType->isIntegerTy(1))
+			{
+				BinExprVal = Builder.CreateURem(CastedLHS, CastedRHS, "modtmp");
+			}
+			else if (HighestPrecisionType->isIntegerTy(32))
+			{
+				BinExprVal = Builder.CreateSRem(CastedLHS, CastedRHS, "modtmp");
+			}
+
+			break;
+		case AND:
+			BinExprVal = Builder.CreateLogicalAnd(CastedLHS, CastedRHS, "andtmp");
+			break;
+		case OR:
+			BinExprVal = Builder.CreateLogicalOr(CastedLHS, CastedRHS, "ortmp");
+			break;
+		case EQ:
+			BinExprVal = Builder.CreateICmpEQ(CastedLHS, CastedRHS, "eqtmp");
+			break;
+		case NE:
+			BinExprVal = Builder.CreateICmpNE(CastedLHS, CastedRHS, "neqtmp");
+			break;
+		case LE:
+			BinExprVal = Builder.CreateICmpULE(CastedLHS, CastedRHS, "lteqtmp");
+			break;
+		case LT:
+			BinExprVal = Builder.CreateICmpULT(CastedLHS, CastedRHS, "lttmp");
+			break;
+		case GE:
+			BinExprVal = Builder.CreateICmpUGE(CastedLHS, CastedRHS, "gteqtmp");
+			break;
+		case GT:
+			BinExprVal = Builder.CreateICmpUGT(CastedLHS, CastedRHS, "gttmp");
+			break;
+		default:
+			throw SemanticException("Invalid Binary Operator", Op.lineNo, Op.columnNo);
+		}
+
+		return BinExprVal;
 	};
 };
 
@@ -1183,12 +1419,43 @@ public:
 		Expr->to_string(prefix + (isLeft ? "│   " : "    "), "", false);
 	};
 
-	llvm::Value *codegen() override{
-		return nullptr;
-	}; 
+	/**
+	 * @brief Generates the Value of the given unary expression. Performs appropriate type casting
+	 *
+	 * @return llvm::Value*
+	 */
+	llvm::Value *codegen() override
+	{
+		llvm::Value *E = Expr->codegen();
+		llvm::Value *UnaryExpr;
+		llvm::Value *CastedValue = E;
 
-	virtual TOKEN getTok() override{
-		return Op;
+		switch (Op.type)
+		{
+		case MINUS:
+			// Only need to cast a -foo if `foo` is a boolean.
+			// Since -int and -float are semantically correct
+			if (E->getType() == IntegerType::getInt1Ty(TheContext))
+			{
+				CastedValue = ImplicitCasting(E, IntegerType::getInt32Ty(TheContext), Op);
+			}
+
+			UnaryExpr = Builder.CreateNeg(CastedValue, "minustmp");
+			break;
+		case NOT:
+			// Must cast both an int and a float to bool before we apply negation to it
+			if (E->getType() != IntegerType::getInt1Ty(TheContext))
+			{
+				CastedValue = ImplicitCasting(E, IntegerType::getInt1Ty(TheContext), Op);
+			}
+
+			UnaryExpr = Builder.CreateNot(CastedValue, "nottmp");
+			break;
+		default:
+			throw SemanticException("Unexepected unary operator", Op.lineNo, Op.columnNo);
+		}
+
+		return UnaryExpr;
 	};
 };
 #pragma endregion
@@ -1214,14 +1481,17 @@ public:
 		std::cout << nodeStr << TypeToStr(Type) << " " << Ident.lexeme << std::endl;
 	};
 
-	llvm::Value *codegen() override{
+	llvm::Value *codegen() override
+	{
 		return nullptr;
 	};
 
-	VAR_TYPE getType(){
-		return Type; 
-	} 
-	TOKEN getIdent(){
+	VAR_TYPE getType()
+	{
+		return Type;
+	}
+	TOKEN getIdent()
+	{
 		return Ident;
 	}
 };
@@ -1250,34 +1520,31 @@ public:
 	}
 
 	/**
-	 * @brief Ensures the function call is valid and generates the values 
-	 *  
-	 * @return llvm::Value* The value generated from the function call 
+	 * @brief Ensures the function call is valid and generates the values
+	 *
+	 * @return llvm::Value* The value generated from the function call
 	 */
-	llvm::Value *codegen() override{
+	llvm::Value *codegen() override
+	{
 		Function *CalleeFunc = TheModule->getFunction(FuncName.lexeme);
 
-		if (!CalleeFunc){
-			throw SemanticException("Unknown Function Referenced: Perhaps you have misspelt your function. ", FuncName.lineNo, FuncName.columnNo);
+		if (!CalleeFunc)
+		{
+			throw SemanticException("Unknown Function Referenced. Perhaps you have misspelt your function. ", FuncName.lineNo, FuncName.columnNo);
 		}
 
-		// Edge case where we have 1 argument, but expect 0, but this one argument is the void argument
-		// We can ensure that correct amount of arguments have been called 
-		bool validVoidCall = CalleeFunc->arg_size() == 0 && Args.size() == 1 && (Args[0]->getTok().type == VOID_TOK);
-		if (!validVoidCall && Args.size() != CalleeFunc->arg_size()){
-			throw SemanticException("Invalid Argument Size: Expected " + std::to_string(CalleeFunc->arg_size()) + ". Got " + std::to_string(Args.size()), FuncName.lineNo, FuncName.columnNo);
+		if (Args.size() != CalleeFunc->arg_size())
+		{
+			throw SemanticException("Invalid Argument Size. Expected " + std::to_string(CalleeFunc->arg_size()) + ". Got " + std::to_string(Args.size()), FuncName.lineNo, FuncName.columnNo);
 		}
 
 		std::vector<Value *> ArgsV;
-		for (auto &Arg : Args){
+		for (auto &Arg : Args)
+		{
 			ArgsV.push_back(Arg->codegen());
 		}
 
 		return Builder.CreateCall(CalleeFunc, ArgsV, "calltmp");
-	}; 
-
-	virtual TOKEN getTok() override{
-		return FuncName;
 	};
 };
 
@@ -1311,87 +1578,95 @@ public:
 			FuncBlock->to_string(prefix + (isLeft ? "│  " : "    "), "Block", false);
 		}
 	};
-	
+
 	/**
-	 * @brief Generate prototype if function doesn't already exist, and add a new-level of scope. 
-	 * 
-	 * @return llvm::Function* The function prototype and body generated 
+	 * @brief Generate prototype if function doesn't already exist, and add a new-level of scope.
+	 *
+	 * @return llvm::Function* The function prototype and body generated
 	 */
-	llvm::Function *codegen() override {
+	llvm::Function *codegen() override
+	{
 		llvm::FunctionType *FT;
 		llvm::Function *FuncDef;
-		std::vector<llvm::Type*> Args;
+		std::vector<llvm::Type *> Args;
 
 		Function *ExternFuncDef = TheModule->getFunction(Ident.lexeme);
 
 		/**
-		 * Generating IR for function Prototype if it doesn't already exist 
+		 * Generating IR for function Prototype if it doesn't already exist
 		 */
-		if (!ExternFuncDef){
-			for (auto &Param : Params){
-				llvm::Type* type = TypeToLLVM(Param->getType(), Ident);
+		if (!ExternFuncDef)
+		{
+			for (auto &Param : Params)
+			{
+				llvm::Type *type = TypeToLLVM(Param->getType(), Ident);
 				Args.push_back(type);
 			}
 
-			// FunctionType::get has different arguments for no-argument functions 
-			if (Args.size() == 0){
-				FT = FunctionType::get(TypeToLLVM(Type, Ident), false); 
-			} else {
-				FT = FunctionType::get(TypeToLLVM(Type, Ident), Args, false); 
+			// FunctionType::get has different arguments for no-argument functions
+			if (Args.size() == 0)
+			{
+				FT = FunctionType::get(TypeToLLVM(Type, Ident), false);
+			}
+			else
+			{
+				FT = FunctionType::get(TypeToLLVM(Type, Ident), Args, false);
 			}
 
 			FuncDef = Function::Create(FT, Function::ExternalLinkage, Ident.lexeme, TheModule.get());
 
-
 			unsigned Idx = 0;
-			for (auto &Arg : FuncDef->args()){
+			for (auto &Arg : FuncDef->args())
+			{
 				Arg.setName(Params[Idx++]->getIdent().lexeme);
 			}
 
-
-			// In the case of __Defining__ an extern function 
+			// In the case of __Defining__ an extern function
 			// We do not create a BasicBlock for a body
-			// We just return the prototype 
-			if (FuncBlock == nullptr){
-				return FuncDef; 
+			// We just return the prototype
+			if (FuncBlock == nullptr)
+			{
+				return FuncDef;
 			}
 		}
 
 		BasicBlock *BB = BasicBlock::Create(TheContext, "entry", FuncDef);
 		Builder.SetInsertPoint(BB);
 
-
-		//Create a new level of scope 
-		std::unordered_map<std::string, llvm::AllocaInst*> FuncScope; 
+		// Create a new level of scope
+		std::unordered_map<std::string, llvm::AllocaInst *> FuncScope;
 		ScopedNamedValues.push_back(FuncScope);
 
-		for (auto &Arg : FuncDef->args()){
+		for (auto &Arg : FuncDef->args())
+		{
 			llvm::AllocaInst *Alloca = CreateEntryBlockAlloca(FuncDef, Arg.getName().data(), Arg.getType());
 			Builder.CreateStore(&Arg, Alloca);
 
-			ScopedNamedValues.back()[std::string(Arg.getName())] = Alloca; 
+			ScopedNamedValues.back()[std::string(Arg.getName())] = Alloca;
 		}
 
-
-		if (Value *RetValue = FuncBlock->codegen()){
+		if (Value *RetValue = FuncBlock->codegen())
+		{
 			Builder.CreateRet(RetValue);
 			verifyFunction(*FuncDef);
 
 			ScopedNamedValues.pop_back();
 			return FuncDef;
-		} 
+		}
 		else
 		{
-			
+
 			// If there was a error within the function block codegen
-			// We must revert this changes. 
+			// We must revert this changes.
+			
+			//HERE FOR TESTING//
 			ScopedNamedValues.pop_back();
 			return FuncDef;
+			//HERE FOR TESTING//
 
 			FuncDef->eraseFromParent();
-			return nullptr; 
+			return nullptr;
 		}
-
 	};
 };
 
@@ -1421,16 +1696,19 @@ public:
 		}
 	};
 
-	llvm::Value *codegen() override{
-		if (FuncDecl != nullptr){
+	llvm::Value *codegen() override
+	{
+		if (FuncDecl != nullptr)
+		{
 			FuncDecl->codegen();
 		}
 
-		if (VarDecl != nullptr){
+		if (VarDecl != nullptr)
+		{
 			VarDecl->codegen();
 		}
 		return nullptr;
-	}; 
+	};
 };
 
 class ProgramAST : public ASTnode
@@ -1458,38 +1736,25 @@ public:
 		}
 	};
 
-
-	llvm::Value *codegen() override{
-		for (auto &Extern : ExternList){
+	llvm::Value *codegen() override
+	{
+		for (auto &Extern : ExternList)
+		{
 			Extern->codegen();
 		}
 
-		for (auto &Decl : DeclList){
+		for (auto &Decl : DeclList)
+		{
 			Decl->codegen();
 		}
 		return nullptr;
-	}; 
+	};
 };
 #pragma endregion
 /// =================================== !! Program & Decls END !! ================================================ ///
 
 /// =================================== !! Literal AST Start !! ================================================ ///
 #pragma region
-class VoidAST : public ExprAST
-{
-	TOKEN voidTok; 
-public:
-	VoidAST(TOKEN voidTok)
-		: voidTok(std::move(voidTok)) {}  
-
-	llvm::Value *codegen() override{
-		return nullptr;
-	}; 
-
-	virtual TOKEN getTok() override{
-		return voidTok;
-	};
-};
 
 class IntegerAST : public ExprAST
 {
@@ -1508,18 +1773,15 @@ public:
 		std::cout << "Int Literal: " << Val.lexeme << std::endl;
 	};
 
-	virtual TOKEN getTok() override{
-		return Val;
-	};
-
 	/**
-	 * @brief Returns constant int value 
-	 * 
-	 * @return llvm::Value* 
+	 * @brief Returns constant int value
+	 *
+	 * @return llvm::Value*
 	 */
-	llvm::Value *codegen() override{
-		return ConstantInt::get(TheContext, APInt(32,std::stoi(Val.lexeme),false));
-	}; 
+	llvm::Value *codegen() override
+	{
+		return ConstantInt::get(TheContext, APInt(32, std::stoi(Val.lexeme), true));
+	};
 };
 class FloatAST : public ExprAST
 {
@@ -1539,16 +1801,13 @@ public:
 	};
 
 	/**
-	 * @brief Returns constant float value 
-	 * 
-	 * @return llvm::Value* 
+	 * @brief Returns constant float value
+	 *
+	 * @return llvm::Value*
 	 */
-	llvm::Value *codegen() override{
+	llvm::Value *codegen() override
+	{
 		return ConstantFP::get(TheContext, APFloat(std::stof(Val.lexeme)));
-	}; 
-
-	virtual TOKEN getTok() override{
-		return Val;
 	};
 };
 
@@ -1570,18 +1829,15 @@ public:
 	};
 
 	/**
-	 * @brief Returns constant bool value 
-	 * 
-	 * @return llvm::Value* 
+	 * @brief Returns constant bool value
+	 *
+	 * @return llvm::Value*
 	 */
-	llvm::Value *codegen() override{
+	llvm::Value *codegen() override
+	{
 		int boolVal = (Val.lexeme == "false" ? 0 : 1);
 
-		return ConstantInt::get(TheContext, APInt(1,boolVal,false));
-	}; 
-
-	virtual TOKEN getTok() override{
-		return Val;
+		return ConstantInt::get(TheContext, APInt(1, boolVal, false));
 	};
 };
 #pragma endregion
@@ -1590,8 +1846,6 @@ public:
 //===----------------------------------------------------------------------===//
 // Recursive Descent Parser - Function call for each production
 //===----------------------------------------------------------------------===//
-
-
 
 // ----- Function Declerations Start ----- //
 #pragma region
@@ -1743,10 +1997,10 @@ static bool ValidType()
 }
 
 /**
- * @brief Checks if the current token is a valid token for starting an expression 
- * 
- * @return true 
- * @return false 
+ * @brief Checks if the current token is a valid token for starting an expression
+ *
+ * @return true
+ * @return false
  */
 static bool ValidExprStart()
 {
@@ -1768,7 +2022,7 @@ static bool ValidExprStart()
 #pragma endregion
 // ------- Helper Functions End ------- //
 
-#pragma region 
+#pragma region
 
 // arg_list_prime ::= "," expr arg_list_prime | epsilon
 static void Arg_List_Prime(std::vector<std::unique_ptr<ExprAST>> &args)
@@ -1821,13 +2075,7 @@ static std::vector<std::unique_ptr<ExprAST>> Args()
 	{
 		args = Arg_List();
 	}
-	else if (CurTok.type == RPAR)
-	{
-		auto voidArg = std::make_unique<VoidAST>(returnTok("void", VOID_TOK));
-
-		args.push_back(std::move(voidArg));
-	}
-	else
+	else if (CurTok.type != RPAR)
 	{
 		throw ParseException("Invalid Token Error: \nExpected: Function Argument or End of Function Call. ");
 	}
@@ -1872,9 +2120,10 @@ static std::unique_ptr<ExprAST> Rval_Term()
 }
 
 // rval_ident_prime ::= epsilon | "(" args ")"
-static std::vector<std::unique_ptr<ExprAST>> Rval_Ident_Prime()
+static std::unique_ptr<ExprAST> Rval_Ident_Prime(TOKEN ident)
 {
 	std::vector<std::unique_ptr<ExprAST>> args;
+	std::unique_ptr<ExprAST> expr;
 
 	switch (CurTok.type)
 	{
@@ -1894,56 +2143,44 @@ static std::vector<std::unique_ptr<ExprAST>> Rval_Ident_Prime()
 	case DIV:
 	case ASTERIX:
 	case MINUS:
+		expr = std::make_unique<Variable>(std::move(ident));
 		break;
 	case LPAR:
 	{
 		Match(LPAR, "Expected '(' before function call. ");
 		args = Args();
 		Match(RPAR, "Expected ')' after function call. ");
+
+		expr = std::make_unique<FuncCallAST>(std::move(ident), std::move(args));
 		break;
 	}
 	default:
 		throw ParseException("Invalid Token Error: \nExpected: One Of [',' New Argument, ')' End of Arguments, ';' End of Expression] or Operation. ");
 	}
-	return args;
+
+	return expr;
 }
 
 // rval_ident ::= IDENT rval_ident_prime | rval_term
 static std::unique_ptr<ExprAST> Rval_Ident()
 {
 	std::unique_ptr<ExprAST> expr;
-	switch (CurTok.type)
-	{
-	case BOOL_LIT:
-	case FLOAT_LIT:
-	case INT_LIT:
+
+	if (CurTok.type == BOOL_LIT || CurTok.type == FLOAT_LIT || CurTok.type == INT_LIT)
 	{
 		expr = Rval_Term();
-		break;
 	}
-	case IDENT:
+	else if (CurTok.type == IDENT)
 	{
 		TOKEN ident = GetIdentAndMatch();
 
-		auto args = Rval_Ident_Prime();
-
-		// Since identifer could be function call or variable
-		// We must identify first if it is a function call or variable
-		// Then create the correct node depending on which
-		if (args.size() == 0)
-		{
-			expr = std::make_unique<Variable>(std::move(ident));
-		}
-		else
-		{
-			expr = std::make_unique<FuncCallAST>(std::move(ident), std::move(args));
-		}
-
-		break;
+		expr = Rval_Ident_Prime(std::move(ident));
 	}
-	default:
-		throw ParseException("Invalid Token Error: \nExpected: Variable or Literal. ");
+	else
+	{
+		throw ParseException("Invalid Token Error: \nExpected: Variable, Literal or Function Call. ");
 	}
+
 	return expr;
 }
 
@@ -2899,7 +3136,7 @@ static VAR_TYPE Var_Type()
 	return type;
 }
 
-// type_spec ::= "void" | var_type       
+// type_spec ::= "void" | var_type
 static VAR_TYPE Type_Spec()
 {
 	VAR_TYPE type;
@@ -3125,16 +3362,14 @@ static std::unique_ptr<ProgramAST> Program()
 
 #pragma endregion
 
-
-static std::unique_ptr<ProgramAST> root; 
-
+static std::unique_ptr<ProgramAST> root;
 
 /**
- * @brief Attempts to create a Root Program AST Node 
+ * @brief Attempts to create a Root Program AST Node
  * Any syntax errors are thrown and caught and reported,
- * 
- * If no syntax errors exist, the AST Printer is ran and prints the AST for the given program 
- * 
+ *
+ * If no syntax errors exist, the AST Printer is ran and prints the AST for the given program
+ *
  */
 static void parser()
 {
@@ -3148,14 +3383,13 @@ static void parser()
 			throw ParseException("Invalid Token Error: \nExpected: end_of_file. ");
 		}
 
-		//AST Printer
-		// root->to_string("", "Program", false);
-		 
+		// AST Printer
+		//  root->to_string("", "Program", false);
 	}
 	catch (const exception &e)
 	{
 		cout << e.what() << endl
-			 << "Got: " << CurTok.lexeme << " line: " << CurTok.lineNo  << " col: " << CurTok.columnNo<< endl;
+			 << "Got: " << CurTok.lexeme << " line: " << CurTok.lineNo << " col: " << CurTok.columnNo << endl;
 		exit(0);
 	}
 }
@@ -3163,8 +3397,6 @@ static void parser()
 //===----------------------------------------------------------------------===//
 // Code Generation
 //===----------------------------------------------------------------------===//
-
-
 
 //===----------------------------------------------------------------------===//
 // Main driver code.
@@ -3204,9 +3436,8 @@ int main(int argc, char **argv)
 	parser();
 	fprintf(stderr, "Parsing Finished\n");
 
-
-
-	try{
+	try
+	{
 		root->codegen();
 	}
 	catch (const exception &e)
@@ -3214,8 +3445,6 @@ int main(int argc, char **argv)
 		cout << e.what() << endl;
 		exit(0);
 	}
-
-	
 
 	//********************* Start printing final IR **************************
 	// Print out all of the generated code into a file called output.ll
@@ -3233,11 +3462,13 @@ int main(int argc, char **argv)
 	/**
 	 * Output any compiler warnings that didn't result in a crash, but may result in undesierable behaivour.
 	 */
-	if (Warnings.size() != 0){
-		std::cout << "Warnings: " << std::endl; 
+	if (Warnings.size() != 0)
+	{
+		std::cout << "Warnings: " << std::endl;
 		int warningCnt = 0;
-		for (auto &Warn : Warnings){
-			std::cout << std::to_string(++warningCnt) << ": " << Warn.to_string() << std::endl;
+		for (auto &Warn : Warnings)
+		{
+			std::cout << std::to_string(++warningCnt) << ". " << Warn.to_string() << std::endl;
 		}
 	}
 
