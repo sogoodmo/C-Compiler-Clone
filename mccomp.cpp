@@ -3027,7 +3027,7 @@ int main(int argc, char **argv)
 		std::cout << "Warnings: " << std::endl; 
 		int warningCnt = 0;
 		for (auto &Warn : Warnings){
-			std::cout << std::to_string(warningCnt) << ": " << Warn.to_string() << "On Line: " << "<< std::endl;
+			std::cout << std::to_string(++warningCnt) << ": " << Warn.to_string() << std::endl;
 		}
 	}
 
