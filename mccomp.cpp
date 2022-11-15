@@ -39,17 +39,87 @@ using namespace llvm;
 using namespace llvm::sys;
 using namespace std;
 
+static LLVMContext TheContext;
+static IRBuilder<> Builder(TheContext);
+static std::unique_ptr<Module> TheModule;
+
+/**
+ * Contains a vector of maps- Where the index of the map indicates it's level of scope 
+ * 
+ * A block may access variables in a scope prior to it in the array, but not after it.  
+ * 
+ * If a variable is defined multiple times 
+ */
+static std::vector<std::map<std::string, llvm::AllocaInst*>> ScopedNamedValues;
+static std::map<std::string, llvm::GlobalVariable*> GlobalVariables;
 
 
+/**
+ * Class to store warnings, but not crash program 
+*/
+class Warning
+{
+	string Err;
 
-//===-------------------- Forward Declerations -------------------------------===//
+public:
+	Warning(string err) : Err(err) {}
 
+	std::string to_string(){
+		return Err; 
+	}
+};
+
+static std::vector<Warning> Warnings;  
+
+
+/**
+ * @brief Class for handling semenatic errors 
+ * 
+ */
+class SemanticException : public exception
+{
+	string Err;
+
+public:
+	SemanticException(string err) : Err(err) {}
+
+	virtual const char *what() const throw()
+	{
+		return Err.c_str();
+	}
+};
+
+/**
+ * @brief Custom exception class for parse errors
+ *
+ */
+class ParseException : public exception
+{
+	string Err;
+
+public:
+	ParseException(string err) : Err(err) {}
+
+	virtual const char *what() const throw()
+	{
+		return Err.c_str();
+	}
+};
+
+template <typename K, typename V>
+bool mapContainsKey(std::map<K, V>& map, K key)
+{
+  if (map.find(key) == map.end()) return false;
+  return true;
+}
 
 FILE *pFile;
 
 //===----------------------------------------------------------------------===//
 // Lexer
 //===----------------------------------------------------------------------===//
+
+#pragma region 
 
 // The lexer returns one of these for known things.
 enum TOKEN_TYPE
@@ -424,6 +494,8 @@ static TOKEN gettok()
 	return returnTok(s, int(ThisChar));
 }
 
+#pragma endregion
+
 //===----------------------------------------------------------------------===//
 // Parser
 //===----------------------------------------------------------------------===//
@@ -457,9 +529,11 @@ class ASTnode
 {
 public:
 	virtual ~ASTnode() {}
-	// virtual Value *codegen() = 0;
+	virtual llvm::Value *codegen() = 0;
 	virtual void to_string(const std::string &prefix, const std::string &nodeStr, bool isLeft) const {};
 };
+
+
 
 enum VAR_TYPE
 {
@@ -470,6 +544,29 @@ enum VAR_TYPE
 };
 
 
+
+/**
+ * @brief Returns the matching llvm type for the type passed in. 
+ * 
+ * @param type The type of the variable 
+ * @return const llvm::Type The LLVM Type of the variable passed 
+ */
+llvm::Type* TypeToLLVM(VAR_TYPE type){
+
+	switch (type)
+	{
+	case VOID_TYPE:
+		return Type::getVoidTy(TheContext);
+	case INT_TYPE:
+		return IntegerType::getInt32Ty(TheContext);
+	case FLOAT_TYPE:
+		return Type::getFloatTy(TheContext);
+	case BOOL_TYPE:
+		return IntegerType::getInt1Ty(TheContext);
+	default:
+		throw SemanticException("Type Error:\nExpected one of ['int', 'void', 'bool', 'float']");
+	}
+}
 
 /**
  * @brief Converts type enum to string 
@@ -494,25 +591,86 @@ const std::string TypeToStr(VAR_TYPE type)
 	}
 }
 
-/**
- * @brief Generic function to print a vector of ast nodes 
- * 
- *
- * 
- * @tparam T Generic type of ASTnode
- * @param NodeVec The vector of nodes to print out 
- * @param prefix The prefix of the vector 
- * @param isLeft Weather the vector was a left subtree
- * @param extraCon Any auxillary conditions to checking if an item is the right subtree
- */
-template <typename T>
-static void PrintVectorAST(std::vector<std::unique_ptr<T>> NodeVec, const std::string &prefix, bool isLeft, bool extraCon = false)
-{
-	for (int i = 0; i < NodeVec.size(); i++)
-	{
-		NodeVec[i]->to_string(prefix + (isLeft ? "│   " : "    "), "", (i != NodeVec.size() - 1) || extraCon);
-	}
+// Create an alloca instruction in the entry block of the function.  
+// This is used for mutable variables etc.
+static AllocaInst *CreateEntryBlockAlloca(Function *TheFunction, const std::string &VarName, llvm::Type *type) {
+  IRBuilder<> TmpB(&TheFunction->getEntryBlock(), TheFunction->getEntryBlock().begin());
+  return TmpB.CreateAlloca(type, 0, VarName.c_str());
 }
+
+
+/**
+ * @brief Adds warning to warning buffer if attempting to implicitly convert and may lose precision
+ * Returns new value after conversion.
+ * 
+ * @param val Value 
+ * @param alloca Alloca to update
+ */
+static llvm::Value* ImplicitCasting(llvm::Value *val,  llvm::Type *newType){
+	llvm::Type *oldType = val->getType();
+	
+	//Float -> Int Conversion - Precision Loss 
+	if (oldType->isFloatTy() && newType->isIntegerTy(32))
+	{
+		Warnings.push_back(Warning("Warning: Implict conversion from Float to Int32. May lose precision"));
+		return Builder.CreateIntCast(val, newType, false);
+	} 
+	
+	//Float -> Bool Conversion - Precision Loss 
+	if (oldType->isFloatTy() && newType->isIntegerTy(1)) 
+	{
+		Warnings.push_back(Warning("Warning: Implict conversion from Bool to Float. May lose precision"));
+		return Builder.CreateFCmpONE(val, ConstantFP::get(TheContext, APFloat(0.0f)));
+	}
+	
+	//Int -> Bool Conversion - Precision Loss 
+	if (oldType->isIntegerTy(32) && newType->isIntegerTy(1))
+	{
+		Warnings.push_back(Warning("Warning: Implict conversion from Float to Int32. May lose precision"));
+		return Builder.CreateICmpNE(val, ConstantInt::get(Type::getInt32Ty(TheContext), 0));
+	}
+	
+	//Int -> Float Conversion - No Precision Loss 
+	if (oldType->isIntegerTy(32) && newType->isFloatTy()) 
+	{
+		return Builder.CreateUIToFP(val, newType);
+	}
+
+	//Bool -> Float Conversion - No Precision Loss 
+	if (oldType->isIntegerTy(1) && newType->isFloatTy()) 
+	{
+		return Builder.CreateUIToFP(val, newType);
+	}
+
+	//Bool -> Int Conversion - No Precision Loss 
+	if (oldType->isIntegerTy(1) && newType->isIntegerTy(32)) 
+	{
+		return Builder.CreateIntCast(val, newType, false);
+	}
+
+	throw SemanticException("Unexpected Type Error: Expected int, bool or float. ");
+}
+
+
+// /**
+//  * @brief Generic function to print a vector of ast nodes 
+//  * 
+//  *
+//  * 
+//  * @tparam T Generic type of ASTnode
+//  * @param NodeVec The vector of nodes to print out 
+//  * @param prefix The prefix of the vector 
+//  * @param isLeft Weather the vector was a left subtree
+//  * @param extraCon Any auxillary conditions to checking if an item is the right subtree
+//  */
+// template <typename T>
+// static void PrintVectorAST(std::vector<std::unique_ptr<T>> NodeVec, const std::string &prefix, bool isLeft, bool extraCon = false)
+// {
+// 	for (int i = 0; i < NodeVec.size(); i++)
+// 	{
+// 		NodeVec[i]->to_string(prefix + (isLeft ? "│   " : "    "), "", (i != NodeVec.size() - 1) || extraCon);
+// 	}
+// }
 
 // ---- AST Declerations ---- //
 #pragma region
@@ -566,7 +724,34 @@ public:
 
 		std::cout << "Variable: " << Ident.lexeme << std::endl;
 	};
+
+	llvm::Value *codegen() override{
+		llvm::Value *V; 
+
+		// Look up the values from the scopes, stopping at the deepest layer of scope it finds
+		// If doesn't exist in any scope- try one more time in the global scope 
+		// If it doesn't exist in the scope, then it will throw an error. 
+
+		for (int i=ScopedNamedValues.size()-1; i > -1; i--){
+			if (mapContainsKey(ScopedNamedValues[i], Ident.lexeme)){
+				
+				AllocaInst *alloca = ScopedNamedValues[i].at(Ident.lexeme);
+				V = Builder.CreateLoad(alloca->getAllocatedType(), alloca, Ident.lexeme.c_str());
+				
+				return V;
+			}
+		}
+
+		if (mapContainsKey(GlobalVariables, Ident.lexeme)){
+			GlobalVariable *alloca = GlobalVariables.at(Ident.lexeme);
+			V = Builder.CreateLoad(alloca->getValueType(), alloca, Ident.lexeme.c_str());
+			return V;
+		} 
+
+		throw SemanticException("Undecleared variable referenced. Perhaps your variable is out of scope?");
+	}; 
 };
+
 class VariableDeclAST : public ASTnode
 {
 	VAR_TYPE Type;
@@ -584,7 +769,28 @@ public:
 
 		std::cout << nodeStr << TypeToStr(Type) << " " << Ident.lexeme << std::endl;
 	};
+
+	llvm::Value *codegen() override{
+		bool isGlobal = ScopedNamedValues.size() == 0;
+		llvm::Type* llvmType = TypeToLLVM(Type);
+
+
+		if (isGlobal)
+		{
+			auto G = new GlobalVariable(*(TheModule.get()), llvmType, false, GlobalValue::CommonLinkage, nullptr);
+			GlobalVariables.insert({Ident.lexeme, G});		
+		}
+		else
+		{
+			//nullptr may be replaced with `Constant::getNullValue(llvmType)`
+			auto V = Builder.CreateAlloca(llvmType, nullptr, Ident.lexeme); 		
+			ScopedNamedValues.back().insert({Ident.lexeme, V});
+		}
+
+		return nullptr;
+	}; 
 };
+
 class VariableAssignmentAST : public ExprAST
 {
 	TOKEN Ident;
@@ -604,6 +810,40 @@ public:
 
 		Expr->to_string(prefix + (isLeft ? "│   " : "    "), "", false);
 	};
+
+	/**
+	 * @brief Generates the value of the expression of our variable assignment 
+	 * Attempts to update the variable (Given it's defined), aswell as throwing warnings for any loss of precision from implicit type casting 
+	 * 
+	 * @return llvm::Value* Nullptr as assigning a variable doesn't return a value 
+	 */
+	llvm::Value *codegen() override{
+		llvm::Value *E = Expr->codegen();
+
+		for (int i=ScopedNamedValues.size()-1; i > -1; i--){
+			if (mapContainsKey(ScopedNamedValues[i], Ident.lexeme)){
+				AllocaInst *alloca = ScopedNamedValues[i].at(Ident.lexeme);
+				
+				llvm::Value *CastedValue = ImplicitCasting(E, alloca->getAllocatedType());
+
+				Builder.CreateStore(CastedValue, alloca);
+				ScopedNamedValues[i][Ident.lexeme] = alloca;
+				return nullptr; 
+			}
+		}
+
+		if (mapContainsKey(GlobalVariables, Ident.lexeme)){
+			GlobalVariable *alloca = GlobalVariables.at(Ident.lexeme);
+
+			llvm::Value *CastedValue = ImplicitCasting(E, alloca->getValueType());
+
+			Builder.CreateStore(CastedValue, alloca);
+			GlobalVariables[Ident.lexeme] = alloca;
+			return nullptr;
+		} 
+
+		throw SemanticException("Undecleared variable referenced. Perhaps your variable is out of scope?");
+	}; 
 };
 #pragma endregion
 /// =================================== !! Variable's END !! ================================================ ///
@@ -636,6 +876,10 @@ public:
 			StmtList[i]->to_string(prefix + (isLeft ? "│   " : "    "), "", (i != StmtList.size() - 1));
 		}
 	};
+
+	llvm::Value *codegen() override{
+		return nullptr;
+	}; 
 };
 class IfAST : public StmtAST
 {
@@ -667,6 +911,10 @@ public:
 			ElseBlock->to_string(prefix + (isLeft ? "│   " : "    "), "", false);
 		}
 	};
+
+	llvm::Value *codegen() override{
+		return nullptr;
+	}; 
 };
 class WhileAST : public StmtAST
 {
@@ -691,6 +939,10 @@ public:
 			LoopBlock->to_string(prefix + (isLeft ? "│   " : "    "), "", false);
 		}
 	};
+
+	llvm::Value *codegen() override{
+		return nullptr;
+	}; 
 };
 class ReturnAST : public StmtAST
 {
@@ -713,6 +965,10 @@ public:
 			ReturnExpr->to_string(prefix + (isLeft ? "│   " : "    "), "", false);
 		}
 	};
+
+	llvm::Value *codegen() override{
+		return nullptr;
+	}; 
 };
 #pragma endregion
 /// =================================== !! Block & Stmts End !! ================================================ ///
@@ -740,6 +996,10 @@ public:
 		RHS->to_string(prefix + (isLeft ? "│   " : "    "), "", true);
 		LHS->to_string(prefix + (isLeft ? "│   " : "    "), "", false);
 	};
+
+	llvm::Value *codegen() override{
+		return nullptr;
+	}; 
 };
 
 class UnaryExprAST : public ExprAST
@@ -761,6 +1021,10 @@ public:
 
 		Expr->to_string(prefix + (isLeft ? "│   " : "    "), "", false);
 	};
+
+	llvm::Value *codegen() override{
+		return nullptr;
+	}; 
 };
 #pragma endregion
 /// =================================== !! Binary / Unary AST End !! ================================================ ///
@@ -784,6 +1048,17 @@ public:
 
 		std::cout << nodeStr << TypeToStr(Type) << " " << Ident.lexeme << std::endl;
 	};
+
+	llvm::Value *codegen() override{
+		return nullptr;
+	};
+
+	VAR_TYPE getType(){
+		return Type; 
+	} 
+	TOKEN getIdent(){
+		return Ident;
+	}
 };
 
 class FuncCallAST : public ExprAST
@@ -808,6 +1083,30 @@ public:
 			Args[i]->to_string(prefix + (isLeft ? "│   " : "    "), "", (i != Args.size() - 1));
 		}
 	}
+
+	/**
+	 * @brief Ensures the function call is valid and generates the values 
+	 *  
+	 * @return llvm::Value* The value generated from the function call 
+	 */
+	llvm::Value *codegen() override{
+		Function *CalleeFunc = TheModule->getFunction(FuncName.lexeme);
+
+		if (!CalleeFunc){
+			throw SemanticException("Unknown Function Referenced: Perhaps you have misspelt your function. ");
+		}
+
+		if (Args.size() != CalleeFunc->arg_size()){
+			throw SemanticException("Invalid Argument Size: Expected " + std::to_string(CalleeFunc->arg_size()) + ". Got " + std::to_string(Args.size()));
+		}
+
+		std::vector<Value *> ArgsV;
+		for (auto &Arg : Args){
+			ArgsV.push_back(Arg->codegen());
+		}
+
+		return Builder.CreateCall(CalleeFunc, ArgsV, "calltmp");
+	}; 
 };
 
 class FuncDeclAST : public ASTnode
@@ -840,71 +1139,86 @@ public:
 			FuncBlock->to_string(prefix + (isLeft ? "│  " : "    "), "Block", false);
 		}
 	};
+	
+	/**
+	 * @brief Generate prototype if function doesn't already exist, and add a new-level of scope. 
+	 * 
+	 * @return llvm::Function* The function prototype and body generated 
+	 */
+	llvm::Function *codegen() override {
+		llvm::FunctionType *FT;
+		llvm::Function *FuncDef;
+		std::vector<llvm::Type*> Args;
+
+		Function *ExternFuncDef = TheModule->getFunction(Ident.lexeme);
+
+		/**
+		 * Generating IR for function Prototype if it doesn't already exist 
+		 */
+		if (!ExternFuncDef){
+			for (auto &Param : Params){
+				llvm::Type* type = TypeToLLVM(Param->getType());
+				Args.push_back(type);
+			}
+
+			// FunctionType::get has different arguments for no-argument functions 
+			if (Args.size() == 0){
+				FT = FunctionType::get(TypeToLLVM(Type), false); 
+			} else {
+				FT = FunctionType::get(TypeToLLVM(Type), Args, false); 
+			}
+
+			FuncDef = Function::Create(FT, Function::ExternalLinkage, Ident.lexeme, TheModule.get());
+
+
+			unsigned Idx = 0;
+			for (auto &Arg : FuncDef->args()){
+				Arg.setName(Params[Idx++]->getIdent().lexeme);
+			}
+
+
+			// In the case of __Defining__ an extern function 
+			// We do not create a BasicBlock for a body
+			// We just return the prototype 
+			if (FuncBlock == nullptr){
+				return FuncDef; 
+			}
+		}
+
+		BasicBlock *BB = BasicBlock::Create(TheContext, "entry", FuncDef);
+		Builder.SetInsertPoint(BB);
+
+
+		//Create a new level of scope 
+		std::map<std::string, llvm::AllocaInst*> FuncScope; 
+		ScopedNamedValues.push_back(FuncScope);
+
+		for (auto &Arg : FuncDef->args()){
+			AllocaInst *Alloca = CreateEntryBlockAlloca(FuncDef, Arg.getName().data(), Arg.getType());
+			Builder.CreateStore(&Arg, Alloca);
+
+			ScopedNamedValues.back()[std::string(Arg.getName())] = Alloca; 
+		}
+
+
+		if (Value *RetValue = FuncBlock->codegen()){
+			Builder.CreateRet(RetValue);
+			verifyFunction(*FuncDef);
+
+			ScopedNamedValues.pop_back();
+			return FuncDef;
+		}
+
+		// If there was a error within the function block codegen
+		// We must revert this changes. 
+		ScopedNamedValues.pop_back();
+		FuncDef->eraseFromParent();
+		return nullptr; 
+	};
 };
 
 #pragma endregion
 /// =================================== !! Functions End !! ================================================ ///
-
-/// =================================== !! Literal AST Start !! ================================================ ///
-#pragma region
-class VoidAST : public ExprAST
-{
-};
-
-class IntegerAST : public ExprAST
-{
-	TOKEN Val;
-
-public:
-	IntegerAST(TOKEN Val)
-		: Val(std::move(Val)) {}
-
-	virtual void to_string(const std::string &prefix, const std::string &nodeStr, bool isLeft) const override
-	{
-		std::cout << prefix;
-
-		std::cout << (isLeft ? "├──" : "└──");
-
-		std::cout << "Int Literal: " << Val.lexeme << std::endl;
-	};
-};
-class FloatAST : public ExprAST
-{
-	TOKEN Val;
-
-public:
-	FloatAST(TOKEN Val)
-		: Val(std::move(Val)) {}
-
-	virtual void to_string(const std::string &prefix, const std::string &nodeStr, bool isLeft) const override
-	{
-		std::cout << prefix;
-
-		std::cout << (isLeft ? "├──" : "└──");
-
-		std::cout << "Float Literal: " << Val.lexeme << std::endl;
-	};
-};
-
-class BoolAST : public ExprAST
-{
-	TOKEN Val;
-
-public:
-	BoolAST(TOKEN Val)
-		: Val(std::move(Val)) {}
-
-	virtual void to_string(const std::string &prefix, const std::string &nodeStr, bool isLeft) const override
-	{
-		std::cout << prefix;
-
-		std::cout << (isLeft ? "├──" : "└──");
-
-		std::cout << "Bool Literal: " << Val.lexeme << std::endl;
-	};
-};
-#pragma endregion
-/// =================================== !! Literal AST End !! ================================================ ///
 
 /// ==================================== Program & Decls START !! =============================================== ///
 #pragma region
@@ -928,6 +1242,17 @@ public:
 			VarDecl->to_string(prefix, "GlobalVarDecl: ", isLeft);
 		}
 	};
+
+	llvm::Value *codegen() override{
+		if (FuncDecl != nullptr){
+			FuncDecl->codegen();
+		}
+
+		if (VarDecl != nullptr){
+			VarDecl->codegen();
+		}
+		return nullptr;
+	}; 
 };
 class ProgramAST : public ASTnode
 {
@@ -953,31 +1278,104 @@ public:
 			DeclList[i]->to_string(prefix + (isLeft ? "│   " : "    "), "GlobalDecl", (i != DeclList.size() - 1));
 		}
 	};
+
+
+	llvm::Value *codegen() override{
+		for (auto &Extern : ExternList){
+			Extern->codegen();
+		}
+
+		for (auto &Decl : DeclList){
+			Decl->codegen();
+		}
+		return nullptr;
+	}; 
 };
 #pragma endregion
 /// =================================== !! Program & Decls END !! ================================================ ///
+
+/// =================================== !! Literal AST Start !! ================================================ ///
+#pragma region
+class VoidAST : public ExprAST
+{
+public:
+	llvm::Value *codegen() override{
+		return nullptr;
+	}; 
+};
+
+class IntegerAST : public ExprAST
+{
+	TOKEN Val;
+
+public:
+	IntegerAST(TOKEN Val)
+		: Val(std::move(Val)) {}
+
+	virtual void to_string(const std::string &prefix, const std::string &nodeStr, bool isLeft) const override
+	{
+		std::cout << prefix;
+
+		std::cout << (isLeft ? "├──" : "└──");
+
+		std::cout << "Int Literal: " << Val.lexeme << std::endl;
+	};
+
+	llvm::Value *codegen() override{
+		return nullptr;
+	}; 
+};
+class FloatAST : public ExprAST
+{
+	TOKEN Val;
+
+public:
+	FloatAST(TOKEN Val)
+		: Val(std::move(Val)) {}
+
+	virtual void to_string(const std::string &prefix, const std::string &nodeStr, bool isLeft) const override
+	{
+		std::cout << prefix;
+
+		std::cout << (isLeft ? "├──" : "└──");
+
+		std::cout << "Float Literal: " << Val.lexeme << std::endl;
+	};
+
+	llvm::Value *codegen() override{
+		return nullptr;
+	}; 
+};
+
+class BoolAST : public ExprAST
+{
+	TOKEN Val;
+
+public:
+	BoolAST(TOKEN Val)
+		: Val(std::move(Val)) {}
+
+	virtual void to_string(const std::string &prefix, const std::string &nodeStr, bool isLeft) const override
+	{
+		std::cout << prefix;
+
+		std::cout << (isLeft ? "├──" : "└──");
+
+		std::cout << "Bool Literal: " << Val.lexeme << std::endl;
+	};
+
+	llvm::Value *codegen() override{
+		return nullptr;
+	}; 
+};
+#pragma endregion
+/// =================================== !! Literal AST End !! ================================================ ///
 
 //===----------------------------------------------------------------------===//
 // Recursive Descent Parser - Function call for each production
 //===----------------------------------------------------------------------===//
 
 
-/**
- * @brief Custom exception class for parse errors
- *
- */
-class ParseException : public exception
-{
-	string Err;
-
-public:
-	ParseException(string err) : Err(err) {}
-
-	virtual const char *what() const throw()
-	{
-		return Err.c_str();
-	}
-};
 
 // ----- Function Declerations Start ----- //
 #pragma region
@@ -1153,6 +1551,8 @@ static bool ValidExprStart()
 
 #pragma endregion
 // ------- Helper Functions End ------- //
+
+#pragma region 
 
 // arg_list_prime ::= "," expr arg_list_prime | epsilon
 static void Arg_List_Prime(std::vector<std::unique_ptr<ExprAST>> &args)
@@ -2507,6 +2907,12 @@ static std::unique_ptr<ProgramAST> Program()
 	return std::make_unique<ProgramAST>(std::move(extern_list), std::move(decl_list));
 }
 
+#pragma endregion
+
+
+static std::unique_ptr<ProgramAST> root; 
+
+
 /**
  * @brief Attempts to create a Root Program AST Node 
  * Any syntax errors are thrown and caught and reported,
@@ -2517,10 +2923,9 @@ static std::unique_ptr<ProgramAST> Program()
 static void parser()
 {
 	getNextToken();
-
 	try
 	{
-		auto P = Program();
+		root = Program();
 
 		if (CurTok.type != EOF_TOK)
 		{
@@ -2528,12 +2933,14 @@ static void parser()
 		}
 
 		//AST Printer
-		P->to_string("", "Program", false);
+		// root->to_string("", "Program", false);
+		 
 	}
 	catch (const exception &e)
 	{
 		cout << e.what() << endl
-			 << "Got: " << CurTok.lexeme << " (Type: " << CurTok.type << ") on-line: " << CurTok.lineNo << endl;
+			 << "Got: " << CurTok.lexeme << " (Type: " << CurTok.type << ") line: " << CurTok.lineNo  << " col: " << CurTok.columnNo<< endl;
+		exit(0);
 	}
 }
 
@@ -2541,9 +2948,7 @@ static void parser()
 // Code Generation
 //===----------------------------------------------------------------------===//
 
-static LLVMContext TheContext;
-static IRBuilder<> Builder(TheContext);
-static std::unique_ptr<Module> TheModule;
+
 
 //===----------------------------------------------------------------------===//
 // Main driver code.
@@ -2583,6 +2988,19 @@ int main(int argc, char **argv)
 	parser();
 	fprintf(stderr, "Parsing Finished\n");
 
+
+
+	try{
+		root->codegen();
+	}
+	catch (const exception &e)
+	{
+		cout << e.what() << endl
+			 << "Got: " << CurTok.lexeme << " (Type: " << CurTok.type << ") line: " << CurTok.lineNo  << " col: " << CurTok.columnNo<< endl;
+	}
+
+	
+
 	//********************* Start printing final IR **************************
 	// Print out all of the generated code into a file called output.ll
 	auto Filename = "output.ll";
@@ -2594,8 +3012,20 @@ int main(int argc, char **argv)
 		errs() << "Could not open file: " << EC.message();
 		return 1;
 	}
-	// TheModule->print(errs(), nullptr); // print IR to terminal
-	TheModule->print(dest, nullptr);
+	TheModule->print(errs(), nullptr); // print IR to terminal#
+
+	/**
+	 * Output any compiler warnings that didn't result in a crash, but may result in undesierable behaivour.
+	 */
+	if (Warnings.size() != 0){
+		std::cout << "Warnings: " << std::endl; 
+		int warningCnt = 0;
+		for (auto &Warn : Warnings){
+			std::cout << std::to_string(warningCnt) << ": " << Warn.to_string() << std::endl;
+		}
+	}
+
+	// TheModule->print(dest, nullptr);
 	//********************* End printing final IR ****************************
 
 	fclose(pFile); // close the file that contains the code that was parsed
