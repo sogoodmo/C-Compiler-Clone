@@ -1,22 +1,23 @@
 // MiniC program to test addition
-extern int int_arg(int x, int a);
-extern float float_arg(float y);
-extern bool bool_arg(bool z);
-extern float no_arg();
+extern void no_arg();
 
-bool bool_test;
-float float_test;
-int int_test;
 
-int test_func(float n, float m)
+int test_func()
 {
-	bool local_bool;
-	int local_int;
-	bool lol; 
-	local_bool = true + 1;
-	local_int = true + 1; 
-	lol = true + true;
+	int x;
+	x = x + 1;
+	;
+	while (x){
+		;
+	}
 }
+
+	// bool local_bool;
+	// int local_int;
+	// bool lol; 
+	// local_bool = true + 1;
+	// local_int = true + 1; 
+	// lol = true + true;
 
 	// float local_float_test;
 	// int local_int_test;
