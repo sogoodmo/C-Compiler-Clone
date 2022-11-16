@@ -1,15 +1,12 @@
 // MiniC program to test addition
-extern void no_arg();
+extern void no_arg(int y);
 
-
-int test_func()
+int test_func(void)
 {
 	int x;
 	x = x + 1;
-	;
-	while (x){
-		;
-	}
+
+	no_arg(3.2);
 }
 
 	// bool local_bool;

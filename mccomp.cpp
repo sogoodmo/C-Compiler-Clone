@@ -53,23 +53,23 @@ static std::unique_ptr<Module> TheModule;
  */
 static std::vector<std::unordered_map<std::string, llvm::AllocaInst *>> ScopedNamedValues;
 static std::unordered_map<std::string, llvm::GlobalVariable *> GlobalVariables;
-static std::unordered_set<std::string> UndefinedVars; 
+static std::unordered_set<std::string> UndefinedVars;
 
 /**
  * Class to store warnings, but not crash program
  */
 class Warning
 {
-	string Err;
+	std::string Err;
 	int lineno;
 	int colno;
 
 public:
-	Warning(string err, int line, int col) : Err(err), lineno(line), colno(col) {}
+	Warning(std::string err, int line, int col) : Err(err), lineno(line), colno(col) {}
 
 	std::string to_string()
 	{
-		return Err + " |Line: " + std::to_string(lineno) + " Col: " + std::to_string(colno) + "|";
+		return Err + ". Line: " + std::to_string(lineno) + " Col: " + std::to_string(colno);
 	}
 };
 
@@ -685,7 +685,7 @@ static llvm::Value *GetTypedCoerecedCondition(llvm::Value *val, llvm::Type *type
  * @param val Value
  * @param alloca Alloca to update
  */
-static llvm::Value *ImplicitCasting(llvm::Value *val, llvm::Type *newType, TOKEN tokInfo)
+static llvm::Value *ImplicitCasting(llvm::Value *val, llvm::Type *newType, TOKEN tokInfo, std::string optionalError="")
 {
 	llvm::Type *oldType = val->getType();
 
@@ -700,35 +700,35 @@ static llvm::Value *ImplicitCasting(llvm::Value *val, llvm::Type *newType, TOKEN
 	// Float -> Int Conversion - Precision Loss
 	if (oldType->isFloatTy() && newType->isIntegerTy(32))
 	{
-		Warnings.push_back(Warning("Warning: Implict conversion from Float to Int32. May lose precision", tokInfo.lineNo, tokInfo.columnNo));
+		Warnings.push_back(Warning("Warning: Implict conversion from Float to Int32. May lose precision" + optionalError, tokInfo.lineNo, tokInfo.columnNo));
 		return Builder.CreateFPToSI(val, newType, tokInfo.lexeme.c_str());
 	}
 
 	// Float -> Bool Conversion - Precision Loss
 	if (oldType->isFloatTy() && newType->isIntegerTy(1))
 	{
-		Warnings.push_back(Warning("Warning: Implict conversion from Bool to Float. May lose precision", tokInfo.lineNo, tokInfo.columnNo));
+		Warnings.push_back(Warning("Warning: Implict conversion from Bool to Float. May lose precision" + optionalError, tokInfo.lineNo, tokInfo.columnNo));
 		return Builder.CreateFCmpONE(val, ConstantFP::get(TheContext, APFloat(0.0f)), tokInfo.lexeme.c_str());
 	}
 
 	// Int -> Bool Conversion - Precision Loss
 	if (oldType->isIntegerTy(32) && newType->isIntegerTy(1))
 	{
-		Warnings.push_back(Warning("Warning: Implict conversion from Int32 to Bool. May lose precision", tokInfo.lineNo, tokInfo.columnNo));
+		Warnings.push_back(Warning("Warning: Implict conversion from Int32 to Bool. May lose precision" + optionalError, tokInfo.lineNo, tokInfo.columnNo));
 		return Builder.CreateICmpNE(val, ConstantInt::get(Type::getInt32Ty(TheContext), 0), tokInfo.lexeme.c_str());
 	}
 
 	// Int -> Float Conversion - No Precision Loss
 	if (oldType->isIntegerTy(32) && newType->isFloatTy())
 	{
-		Warnings.push_back(Warning("Warning: Implict conversion from Int32 to Float. May result in unexpected behaivour", tokInfo.lineNo, tokInfo.columnNo));
+		// Warnings.push_back(Warning("Warning: Implict conversion from Int32 to Float. May result in unexpected behaivour" + optionalError, tokInfo.lineNo, tokInfo.columnNo));
 		return Builder.CreateSIToFP(val, newType, tokInfo.lexeme.c_str());
 	}
 
 	// Bool -> Float Conversion - No Precision Loss
 	if (oldType->isIntegerTy(1) && newType->isFloatTy())
 	{
-		Warnings.push_back(Warning("Warning: Implict conversion from Bool to Float. May result in unexpected behaivour", tokInfo.lineNo, tokInfo.columnNo));
+		// Warnings.push_back(Warning("Warning: Implict conversion from Bool to Float. May result in unexpected behaivour" + optionalError, tokInfo.lineNo, tokInfo.columnNo));
 		return Builder.CreateUIToFP(val, newType, tokInfo.lexeme.c_str());
 	}
 
@@ -736,7 +736,7 @@ static llvm::Value *ImplicitCasting(llvm::Value *val, llvm::Type *newType, TOKEN
 	if (oldType->isIntegerTy(1) && newType->isIntegerTy(32))
 	{
 
-		Warnings.push_back(Warning("Warning: Implict conversion from Bool to Int32. May result in unexpected behaivour", tokInfo.lineNo, tokInfo.columnNo));
+		// Warnings.push_back(Warning("Warning: Implict conversion from Bool to Int32. May result in unexpected behaivour" + optionalError, tokInfo.lineNo, tokInfo.columnNo));
 		return Builder.CreateIntCast(val, newType, true, tokInfo.lexeme.c_str());
 	}
 
@@ -831,15 +831,15 @@ public:
 		// If doesn't exist in any scope- try one more time in the global scope
 		// If it doesn't exist in the scope, then it will throw an error.
 
-
 		for (int i = ScopedNamedValues.size() - 1; i > -1; i--)
 		{
 			if (mapContainsKey(ScopedNamedValues[i], Ident.lexeme))
 			{
 
 				llvm::AllocaInst *alloca = ScopedNamedValues[i].at(Ident.lexeme);
-				
-				if (UndefinedVars.count(Ident.lexeme) != 0){
+
+				if (UndefinedVars.count(Ident.lexeme) != 0)
+				{
 					UndefinedVars.erase(Ident.lexeme);
 
 					Warnings.push_back(Warning("Warning: Referencing undefined variable. Using default value", Ident.lineNo, Ident.columnNo));
@@ -853,15 +853,15 @@ public:
 		{
 			GlobalVariable *globalAlloca = GlobalVariables.at(Ident.lexeme);
 
-			if (UndefinedVars.count(Ident.lexeme) != 0){
+			if (UndefinedVars.count(Ident.lexeme) != 0)
+			{
 				UndefinedVars.erase(Ident.lexeme);
 				Warnings.push_back(Warning("Warning: Referencing undefined global variable. Using default value", Ident.lineNo, Ident.columnNo));
 				return Builder.CreateLoad(globalAlloca->getValueType(), Constant::getNullValue(globalAlloca->getValueType()), Ident.lexeme.c_str());
 			}
 			return Builder.CreateLoad(globalAlloca->getValueType(), globalAlloca, Ident.lexeme.c_str());
-
 		}
-		
+
 		// for (int i = ScopedNamedValues.size() - 1; i > -1; i--)
 		// {
 		// 	if (mapContainsKey(ScopedNamedValues[i], Ident.lexeme))
@@ -881,7 +881,6 @@ public:
 
 		// 	return V;
 		// }
-
 
 		throw SemanticException("Undecleared variable referenced. Perhaps your variable is out of scope?", Ident.lineNo, Ident.columnNo);
 	};
@@ -974,6 +973,8 @@ public:
 	 * If it succesfully updates the value of the variable in it's current scope,
 	 * It must go through all of it's parents scope (and global scope) and update the value there if it exists
 	 *
+	 * Finally we must store the fact that the variable is no longer undefined.
+	 *
 	 * @return llvm::Value* Nullptr as assigning a variable doesn't return a value
 	 */
 	llvm::Value *codegen() override
@@ -993,6 +994,7 @@ public:
 				Builder.CreateStore(CastedValue, alloca);
 				ScopedNamedValues[i][Ident.lexeme] = alloca;
 
+				UndefinedVars.erase(Ident.lexeme);
 				// Finally check if this variable has been assigned a value higher up in scope
 				// And update the value of the variable at that scope
 				UpdateParentScopeValues(CastedValue, Ident.lexeme, i);
@@ -1015,6 +1017,7 @@ public:
 			Builder.CreateStore(CastedValue, globalAlloca);
 			GlobalVariables[Ident.lexeme] = globalAlloca;
 
+			UndefinedVars.erase(Ident.lexeme);
 			return nullptr;
 		}
 
@@ -1042,7 +1045,6 @@ public:
 		std::cout << (isLeft ? "├──" : "└──");
 
 		std::cout << "Block" << std::endl;
-		
 
 		for (int i = 0; i < VarDecls.size(); i++)
 		{
@@ -1206,7 +1208,7 @@ public:
 		BasicBlock *MergeBB = BasicBlock::Create(TheContext, "whilecont");
 
 		Builder.CreateCondBr(CondValue, LoopBB, MergeBB);
-		
+
 		// Loop
 		Builder.SetInsertPoint(LoopBB);
 		ScopedNamedValues.push_back(std::unordered_map<std::string, llvm::AllocaInst *>());
@@ -1215,8 +1217,7 @@ public:
 
 		ScopedNamedValues.pop_back();
 		Builder.SetInsertPoint(LoopBB);
-		// Loop 
-
+		// Loop
 
 		// Exiting
 		TheFunction->getBasicBlockList().push_back(MergeBB);
@@ -1299,24 +1300,25 @@ public:
 		llvm::Value *CastedRHS;
 
 		/**
-		 * AND, OR, EQ, NEQ, GT, GE, LT, LE - We must cast both types to bools. Regardless of what they already are
+		 * AND, OR - We must cast both types to bools. Regardless of what they already are
 		 *
 		 * Correctly coerce the type of the RHS and LHS
 		 *
 		 */
+
 		switch (Op.type)
 		{
 		case AND:
 		case OR:
+			CastedLHS = ImplicitCasting(LHSVal, IntegerType::getInt1Ty(TheContext), Op);
+			CastedRHS = ImplicitCasting(RHSVal, IntegerType::getInt1Ty(TheContext), Op);
+			break;
 		case EQ:
 		case NE:
 		case LE:
 		case LT:
 		case GE:
 		case GT:
-			CastedLHS = ImplicitCasting(LHSVal, IntegerType::getInt1Ty(TheContext), Op);
-			CastedRHS = ImplicitCasting(RHSVal, IntegerType::getInt1Ty(TheContext), Op);
-			break;
 		case PLUS:
 		case MINUS:
 		case ASTERIX:
@@ -1331,6 +1333,12 @@ public:
 
 		switch (Op.type)
 		{
+		case AND:
+			BinExprVal = Builder.CreateLogicalAnd(CastedLHS, CastedRHS, "andtmp");
+			break;
+		case OR:
+			BinExprVal = Builder.CreateLogicalOr(CastedLHS, CastedRHS, "iortmp");
+			break;
 		case PLUS:
 			if (HighestPrecisionType->isFloatTy())
 			{
@@ -1340,8 +1348,8 @@ public:
 			{
 				BinExprVal = Builder.CreateAdd(CastedLHS, CastedRHS, "addtmp");
 			}
-			break;
 
+			break;
 		case MINUS:
 			if (HighestPrecisionType->isFloatTy())
 			{
@@ -1351,8 +1359,8 @@ public:
 			{
 				BinExprVal = Builder.CreateSub(CastedLHS, CastedRHS, "subtmp");
 			}
+			
 			break;
-
 		case ASTERIX:
 			if (HighestPrecisionType->isFloatTy())
 			{
@@ -1362,8 +1370,8 @@ public:
 			{
 				BinExprVal = Builder.CreateMul(CastedLHS, CastedRHS, "multmp");
 			}
-			break;
 
+			break;
 		case DIV:
 			if (HighestPrecisionType->isFloatTy())
 			{
@@ -1394,29 +1402,71 @@ public:
 			}
 
 			break;
-		case AND:
-			BinExprVal = Builder.CreateLogicalAnd(CastedLHS, CastedRHS, "andtmp");
-			break;
-		case OR:
-			BinExprVal = Builder.CreateLogicalOr(CastedLHS, CastedRHS, "iortmp");
-			break;
 		case EQ:
-			BinExprVal = Builder.CreateICmpEQ(CastedLHS, CastedRHS, "ieqtmp");
+			if (HighestPrecisionType->isFloatTy())
+			{
+				BinExprVal = Builder.CreateFCmpOEQ(CastedLHS, CastedRHS, "feqtmp");
+			}
+			else
+			{
+				BinExprVal = Builder.CreateICmpEQ(CastedLHS, CastedRHS, "ieqtmp");
+			}
+
 			break;
 		case NE:
-			BinExprVal = Builder.CreateICmpNE(CastedLHS, CastedRHS, "ineqtmp");
+			if (HighestPrecisionType->isFloatTy())
+			{
+				BinExprVal = Builder.CreateFCmpONE(CastedLHS, CastedRHS, "fneqtmp");
+			}
+			else
+			{
+				BinExprVal = Builder.CreateICmpNE(CastedLHS, CastedRHS, "ineqtmp");
+			}
+
 			break;
 		case LE:
-			BinExprVal = Builder.CreateICmpULE(CastedLHS, CastedRHS, "ilteqtmp");
+			if (HighestPrecisionType->isFloatTy())
+			{
+				BinExprVal = Builder.CreateFCmpOLE(CastedLHS, CastedRHS, "flteqtmp");
+			}
+			else
+			{
+				BinExprVal = Builder.CreateICmpULE(CastedLHS, CastedRHS, "ilteqtmp");
+			}
+
 			break;
 		case LT:
-			BinExprVal = Builder.CreateICmpULT(CastedLHS, CastedRHS, "ilttmp");
+			if (HighestPrecisionType->isFloatTy())
+			{
+				BinExprVal = Builder.CreateFCmpOLT(CastedLHS, CastedRHS, "flttmp");
+			}
+			else
+			{
+				BinExprVal = Builder.CreateICmpULT(CastedLHS, CastedRHS, "ilttmp");
+			}
+
 			break;
 		case GE:
-			BinExprVal = Builder.CreateICmpUGE(CastedLHS, CastedRHS, "igteqtmp");
+			if (HighestPrecisionType->isFloatTy())
+			{
+				BinExprVal = Builder.CreateFCmpOGE(CastedLHS, CastedRHS, "fgteqtmp");
+			}
+			else
+			{
+				BinExprVal = Builder.CreateICmpUGE(CastedLHS, CastedRHS, "igteqtmp");
+			}
+
 			break;
 		case GT:
-			BinExprVal = Builder.CreateICmpUGT(CastedLHS, CastedRHS, "igttmp");
+			if (HighestPrecisionType->isFloatTy())
+			{
+				BinExprVal = Builder.CreateFCmpOGT(CastedLHS, CastedRHS, "fgttmp");
+			}
+			else
+			{
+				BinExprVal = Builder.CreateICmpUGT(CastedLHS, CastedRHS, "igttmp");
+			}
+
 			break;
 		default:
 			throw SemanticException("Invalid Binary Operator", Op.lineNo, Op.columnNo);
@@ -1566,9 +1616,17 @@ public:
 		}
 
 		std::vector<Value *> ArgsV;
+		llvm::Type *funcArgType; 
+
+		int idx = 0; 
 		for (auto &Arg : Args)
 		{
-			ArgsV.push_back(Arg->codegen());
+			llvm::Value *argExpr = Arg->codegen();
+			funcArgType = CalleeFunc->getArg(idx++)->getType();
+
+			argExpr = ImplicitCasting(argExpr, funcArgType, FuncName, " in Function Call (" + FuncName.lexeme + ")");
+
+			ArgsV.push_back(argExpr);
 		}
 
 		return Builder.CreateCall(CalleeFunc, ArgsV, "calltmp");
@@ -1642,7 +1700,7 @@ public:
 
 			FuncDef = Function::Create(FT, Function::ExternalLinkage, Ident.lexeme, TheModule.get());
 
-			unsigned Idx = 0;
+			int Idx = 0;
 			for (auto &Arg : FuncDef->args())
 			{
 				Arg.setName(Params[Idx++]->getIdent().lexeme);
@@ -2941,7 +2999,8 @@ static void Stmt_List(std::vector<std::unique_ptr<StmtAST>> &stmt_list)
 	{
 		auto stmt = Stmt();
 
-		if (stmt != nullptr){
+		if (stmt != nullptr)
+		{
 			stmt_list.push_back(std::move(stmt));
 		}
 
@@ -3397,13 +3456,13 @@ static void parser()
 		}
 
 		// AST Printer
-		root->to_string("", "Program", false);
+		// root->to_string("", "Program", false);
 	}
-	catch (const exception &e)
+	catch (const std::exception &e)
 	{
-		cout << e.what() << endl
-			 << "Got: " << CurTok.lexeme << " line: " << CurTok.lineNo << " col: " << CurTok.columnNo << endl;
-		exit(0);
+		std::cout << e.what() << std::endl
+				  << "Got: " << CurTok.lexeme << " line: " << CurTok.lineNo << " col: " << CurTok.columnNo << endl;
+		exit(1);
 	}
 }
 
@@ -3453,10 +3512,10 @@ int main(int argc, char **argv)
 	{
 		root->codegen();
 	}
-	catch (const exception &e)
+	catch (const std::exception &e)
 	{
-		cout << e.what() << endl;
-		exit(0);
+		std::cout << e.what() << std::endl;
+		exit(1);
 	}
 
 	//********************* Start printing final IR **************************
@@ -3470,7 +3529,7 @@ int main(int argc, char **argv)
 		errs() << "Could not open file: " << EC.message();
 		return 1;
 	}
-	TheModule->print(errs(), nullptr); // print IR to terminal#
+	// TheModule->print(errs(), nullptr); // print IR to terminal#
 
 	/**
 	 * Output any compiler warnings that didn't result in a crash, but may result in undesierable behaivour.
@@ -3485,7 +3544,7 @@ int main(int argc, char **argv)
 		}
 	}
 
-	// TheModule->print(dest, nullptr);
+	TheModule->print(dest, nullptr);
 	//********************* End printing final IR ****************************
 
 	fclose(pFile); // close the file that contains the code that was parsed
