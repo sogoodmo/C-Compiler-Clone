@@ -2478,19 +2478,18 @@ static std::unique_ptr<ExprAST> Rval_Add_Prime(std::unique_ptr<ExprAST> LHS)
 // rval_add ::= rval_mul rval_add_prime
 static std::unique_ptr<ExprAST> Rval_Add()
 {
-	std::unique_ptr<ExprAST> LHS;
-	std::unique_ptr<ExprAST> expr;
+	std::unique_ptr<ExprAST> LHS = Rval_Mul();
+	
+	while (CurTok.type == PLUS || CurTok.type == MINUS){
+		TOKEN op = CurTok;
+		getNextToken();
 
-	if (ValidPresedenceLayer(CurTok.type))
-	{
-		LHS = Rval_Mul();
-		expr = Rval_Add_Prime(std::move(LHS));
+		auto RHS = Rval_Mul();
+
+		LHS = std::make_unique<BinaryExprAST>(op, std::move(LHS), std::move(RHS));
 	}
-	else
-	{
-		throw ParseException("Invalid Token Error: \nExpected: Start of Expression. ");
-	}
-	return expr;
+
+	return Rval_Add_Prime(std::move(LHS));
 }
 
 // rval_cmp_prime ::= "<=" rval_add | "<" rval_add | ">=" rval_add | ">" rval_add | epsilon
@@ -2561,19 +2560,18 @@ static std::unique_ptr<ExprAST> Rval_Cmp_Prime(std::unique_ptr<ExprAST> LHS)
 // rval_cmp ::= rval_add rval_cmp_prime
 static std::unique_ptr<ExprAST> Rval_Cmp()
 {
-	std::unique_ptr<ExprAST> LHS;
-	std::unique_ptr<ExprAST> expr;
+	std::unique_ptr<ExprAST> LHS = Rval_Add();
+	
+	while (CurTok.type == LT || CurTok.type == LE || CurTok.type == GT || CurTok.type == GE){
+		TOKEN op = CurTok;
+		getNextToken();
 
-	if (ValidPresedenceLayer(CurTok.type))
-	{
-		LHS = Rval_Add();
-		expr = Rval_Cmp_Prime(std::move(LHS));
+		auto RHS = Rval_Add();
+
+		LHS = std::make_unique<BinaryExprAST>(op, std::move(LHS), std::move(RHS));
 	}
-	else
-	{
-		throw ParseException("Invalid Token Error: \nExpected: Start of Expression. ");
-	}
-	return expr;
+
+	return Rval_Cmp_Prime(std::move(LHS));
 }
 
 // rval_eq_prime ::= "==" rval_cmp | "!=" rval_cmp | epsilon
@@ -2623,20 +2621,18 @@ static std::unique_ptr<ExprAST> Rval_Eq_Prime(std::unique_ptr<ExprAST> LHS)
 // rval_eq ::= rval_cmp rval_eq_prime
 static std::unique_ptr<ExprAST> Rval_Eq()
 {
-	std::unique_ptr<ExprAST> LHS;
-	std::unique_ptr<ExprAST> expr;
+	std::unique_ptr<ExprAST> LHS = Rval_Cmp();
+	
+	while (CurTok.type == EQ || CurTok.type == NE){
+		TOKEN op = CurTok;
+		getNextToken();
 
-	if (ValidPresedenceLayer(CurTok.type))
-	{
-		LHS = Rval_Cmp();
-		expr = Rval_Eq_Prime(std::move(LHS));
-	}
-	else
-	{
-		throw ParseException("Invalid Token Error: \nExpected: Start of Expression. ");
+		auto RHS = Rval_Cmp();
+
+		LHS = std::make_unique<BinaryExprAST>(op, std::move(LHS), std::move(RHS));
 	}
 
-	return expr;
+	return Rval_Eq_Prime(std::move(LHS));
 }
 
 // rval_and_prime ::= "&&" rval_eq rval_and_prime | epsilon
@@ -2675,20 +2671,18 @@ static std::unique_ptr<ExprAST> Rval_And_Prime(std::unique_ptr<ExprAST> LHS)
 // rval_and ::= rval_eq rval_and_prime
 static std::unique_ptr<ExprAST> Rval_And()
 {
-	std::unique_ptr<ExprAST> LHS;
-	std::unique_ptr<ExprAST> expr;
+	std::unique_ptr<ExprAST> LHS = Rval_Eq();
 
-	if (ValidPresedenceLayer(CurTok.type))
-	{
-		LHS = Rval_Eq();
-		expr = Rval_And_Prime(std::move(LHS));
-	}
-	else
-	{
-		throw ParseException("Invalid Token Error: \nExpected: Start of Expression. ");
-	}
+	while (CurTok.type == AND){
+		TOKEN op = CurTok;
+		getNextToken();
 
-	return expr;
+		auto RHS = Rval_Eq();
+
+		LHS = std::make_unique<BinaryExprAST>(op, std::move(LHS), std::move(RHS));
+	}
+	
+	return Rval_And_Prime(std::move(LHS));
 }
 
 // rval_or_prime ::= "||" rval_and rval_or_prime | epsilon
@@ -2726,20 +2720,18 @@ static std::unique_ptr<ExprAST> Rval_Or_Prime(std::unique_ptr<ExprAST> LHS)
 // rval_or ::= rval_and rval_or_prime
 static std::unique_ptr<ExprAST> Rval_Or()
 {
-	std::unique_ptr<ExprAST> LHS;
-	std::unique_ptr<ExprAST> expr;
+	std::unique_ptr<ExprAST> LHS = Rval_And();
+	
+	while (CurTok.type == OR){
+		TOKEN op = CurTok;
+		getNextToken();
 
-	if (ValidPresedenceLayer(CurTok.type))
-	{
-		LHS = Rval_And();
-		expr = Rval_Or_Prime(std::move(LHS));
-	}
-	else
-	{
-		throw ParseException("Invalid Token Error: \nExpected: Expression. ");
+		auto RHS = Rval_And();
+
+		LHS = std::make_unique<BinaryExprAST>(op, std::move(LHS), std::move(RHS));
 	}
 
-	return expr;
+	return Rval_Or_Prime(std::move(LHS));
 }
 
 // expr ::= IDENT "=" expr | rval_or
