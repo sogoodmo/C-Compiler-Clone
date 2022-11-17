@@ -14,6 +14,6 @@ int returns(int x) {
         return 2;
         x = x + 1;
     }
-    return 3;
+    // return 3;
     x = x + 1;
 }

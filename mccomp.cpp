@@ -54,6 +54,7 @@ static std::unique_ptr<Module> TheModule;
 static std::vector<std::unordered_map<std::string, llvm::AllocaInst *>> ScopedNamedValues;
 static std::unordered_map<std::string, llvm::GlobalVariable *> GlobalVariables;
 static std::unordered_set<std::string> UndefinedVars;
+static bool IfPathsReturn = false; 
 
 // Global variable to check if adding a new scope is due to a function, or braces. 
 bool isFuncBlock = true; 
@@ -1173,7 +1174,9 @@ public:
 					addReturnWarning(returnStmt->getRetTok().lineNo, returnStmt->getRetTok().columnNo);
 				}
 				stmt->codegen();
-				break;
+
+				// Just returning any non-null value 
+				return ConstantInt::get(TheContext, APInt(1, 0, false));
 			}
 			else
 			{
@@ -1231,6 +1234,9 @@ public:
 	 */
 	llvm::Value *codegen() override
 	{
+		bool trueBlockReturn = false;
+		bool elseBlockReturn = false;
+
 		Function *TheFunction = Builder.GetInsertBlock()->getParent();
 		llvm::Value *CondValue = ConditionExpr->codegen();
 		llvm::Type *CondType = CondValue->getType();
@@ -1254,7 +1260,8 @@ public:
 		ScopedNamedValues.push_back(std::unordered_map<std::string, llvm::AllocaInst *>());
 
 		Builder.SetInsertPoint(TrueBB);
-		TrueBlock->codegen();
+
+		trueBlockReturn = TrueBlock->codegen() != nullptr;
 
 		Builder.CreateBr(MergeBB);
 		TrueBB = Builder.GetInsertBlock();
@@ -1269,7 +1276,8 @@ public:
 
 			TheFunction->getBasicBlockList().push_back(ElseBB);
 			Builder.SetInsertPoint(ElseBB);
-			ElseBlock->codegen();
+
+			elseBlockReturn = ElseBlock->codegen() != nullptr;
 
 			Builder.CreateBr(MergeBB);
 			ElseBB = Builder.GetInsertBlock();
@@ -1282,6 +1290,13 @@ public:
 		TheFunction->getBasicBlockList().push_back(MergeBB);
 		Builder.SetInsertPoint(MergeBB);
 		// ----- Continue ------ //
+
+		// If an if statement gurantees a return statement 
+		// Keep track of this 
+		if (trueBlockReturn && ElseBlock != nullptr && elseBlockReturn)
+		{
+			IfPathsReturn = IfPathsReturn || true; 
+		}
 
 		return nullptr;
 	};
@@ -1807,6 +1822,7 @@ public:
 		llvm::FunctionType *FT;
 		llvm::Function *FuncDef;
 		std::vector<llvm::Type *> Args;
+		bool FuncContainsReturn = false; 
 
 		Function *ExternFuncDef = TheModule->getFunction(Ident.lexeme);
 		
@@ -1866,9 +1882,45 @@ public:
 			ScopedNamedValues.back()[Arg.getName().data()] = Alloca;
 		}
 
+		// Flag used to check if we need to add another layer of scope
 		isFuncBlock = true; 
 
-		FuncBlock->codegen();
+		FuncContainsReturn = FuncBlock->codegen() != nullptr;
+		bool AllPathsReturn = IfPathsReturn || FuncContainsReturn;
+		llvm::Type *FuncReturnType = Builder.getCurrentFunctionReturnType();
+
+		// If the function isn't void
+		// and not all paths return a value this must throw an exception
+		if (!AllPathsReturn && !FuncReturnType->isVoidTy())
+		{
+			throw SemanticException("Not all code paths return value in non-void function.", Ident.lineNo, Ident.columnNo);
+		}
+
+		
+		/**
+		 * Need to create empty return value if a if-statement will gurantee a return from a function.
+		 */
+		if (IfPathsReturn && !FuncContainsReturn){
+			Warnings.push_back(Warning("\033[0;33mWarning:\033[0m Any code after if-statement will not be executed in Function: "+Ident.lexeme, Ident.lineNo, Ident.columnNo));
+			
+			if (FuncReturnType->isVoidTy())
+			{
+				Builder.CreateRetVoid();
+			}
+			else if (FuncReturnType->isFloatTy())
+			{
+				Builder.CreateRet(ConstantFP::get(TheContext, APFloat(0.0f)));
+			}
+			else if (FuncReturnType->isIntegerTy(1))
+			{
+				Builder.CreateRet(ConstantInt::get(TheContext, APInt(1, 0, false)));
+			}
+			else if (FuncReturnType->isIntegerTy(32))
+			{
+				Builder.CreateRet(ConstantInt::get(TheContext, APInt(32, 0, true)));
+			}
+		}
+
 		llvm::verifyFunction(*FuncDef);
 
 		ScopedNamedValues.pop_back();

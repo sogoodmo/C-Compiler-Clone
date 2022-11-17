@@ -32,5 +32,8 @@ else:                                             ; preds = %whilecont
   br label %ifcont
 
 ifcont:                                           ; preds = %else, %then
-  ret i32 3
+  %x4 = load i32, ptr %x1, align 4
+  %addtmp = add i32 %x4, 1
+  store i32 %addtmp, ptr %x1, align 4
+  ret i32 0
 }

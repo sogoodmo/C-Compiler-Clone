@@ -31,16 +31,9 @@ entry:
   %b5 = load i1, ptr %b, align 1
   %ortmp = or i1 true, %b5
   store i1 %ortmp, ptr %b2, align 1
-  %calltmp = call i32 @print_int(i32 1)
-  %b6 = load i1, ptr %b, align 1
-  %print_int = zext i1 %b6 to i32
-  %calltmp7 = call i32 @print_int(i32 %print_int)
-  %b28 = load i1, ptr %b2, align 1
-  %print_int9 = zext i1 %b28 to i32
-  %calltmp10 = call i32 @print_int(i32 %print_int9)
-  %b211 = load i1, ptr %b2, align 1
-  %i212 = zext i1 %b211 to i32
-  store i32 %i212, ptr %i2, align 4
-  %i213 = load i32, ptr %i2, align 4
-  ret i32 %i213
+  %b26 = load i1, ptr %b2, align 1
+  %i27 = zext i1 %b26 to i32
+  store i32 %i27, ptr %i2, align 4
+  %i28 = load i32, ptr %i2, align 4
+  ret i32 %i28
 }

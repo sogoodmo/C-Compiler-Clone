@@ -35,6 +35,7 @@ else:                                             ; preds = %entry
   br label %ifcont
 
 ifcont:                                           ; preds = %else, %then
+  ret i32 0
 }
 
 define i32 @lazyeval_or(i32 %control) {
@@ -61,4 +62,5 @@ else:                                             ; preds = %entry
   br label %ifcont
 
 ifcont:                                           ; preds = %else, %then
+  ret i32 0
 }
