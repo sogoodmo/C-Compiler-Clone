@@ -1185,6 +1185,9 @@ public:
 				}
 				stmt->codegen();
 				// Just returning any non-null value 
+				if (addScope){
+					ScopedNamedValues.pop_back();
+				}
 				return ConstantInt::get(TheContext, APInt(1, 0, false));
 			}
 			else
