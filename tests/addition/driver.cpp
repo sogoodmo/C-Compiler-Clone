@@ -20,12 +20,12 @@ extern "C" DLLEXPORT float print_float(float X) {
 }
 
 extern "C" {
-    int addition(int n, int m);
+    int add();
 }
 
 int main() {
-    if(addition(6, 3) == 9) 
-      std::cout << "PASSED Result: " << addition(6, 3) << std::endl;
+    if(add() == 5) 
+      std::cout << "PASSED Result: " << add() << std::endl;
   	else 
-  	  std::cout << "FALIED Result: " << addition(6, 3) << std::endl;
+  	  std::cout << "FALIED Result: " << add() << std::endl;
 }

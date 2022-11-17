@@ -1132,7 +1132,14 @@ public:
 		BasicBlock *ElseBB = BasicBlock::Create(TheContext, "else");
 		BasicBlock *MergeBB = BasicBlock::Create(TheContext, "ifcont");
 
-		Builder.CreateCondBr(CondValue, TrueBB, ElseBB);
+		if (ElseBlock != nullptr)
+		{
+			Builder.CreateCondBr(CondValue, TrueBB, ElseBB);
+		}
+		else
+		{
+			Builder.CreateCondBr(CondValue, TrueBB, MergeBB);
+		}
 
 		// ----- True ------ //
 		ScopedNamedValues.push_back(std::unordered_map<std::string, llvm::AllocaInst *>());
@@ -1250,8 +1257,23 @@ public:
 		}
 	};
 
+	/**
+	 * @brief Create a return llvm object if it exists in the code. 
+	 * 
+	 * @return llvm::Value* 
+	 */
 	llvm::Value *codegen() override
-	{
+	{	
+		if (ReturnExpr != nullptr)
+		{
+			llvm::Value *RetValue = ReturnExpr->codegen(); 
+			Builder.CreateRet(RetValue);
+		}
+		else
+		{
+			Builder.CreateRetVoid();
+		}
+
 		return nullptr;
 	};
 };
@@ -1278,8 +1300,8 @@ public:
 
 		std::cout << "BinaryExpr: " << Op.lexeme << std::endl;
 
-		RHS->to_string(prefix + (isLeft ? "│   " : "    "), "", true);
-		LHS->to_string(prefix + (isLeft ? "│   " : "    "), "", false);
+		LHS->to_string(prefix + (isLeft ? "│   " : "    "), "", true);
+		RHS->to_string(prefix + (isLeft ? "│   " : "    "), "", false);
 	};
 
 	/**
@@ -1516,7 +1538,7 @@ public:
 			{
 				CastedValue = ImplicitCasting(E, IntegerType::getInt32Ty(TheContext), Op);
 			}
-
+			std::cout << "FUCKER MOTHER" << std::endl;
 			UnaryExpr = Builder.CreateNeg(CastedValue, "minustmp");
 			break;
 		case NOT:
@@ -2641,6 +2663,7 @@ static std::unique_ptr<ExprAST> Rval_And_Prime(std::unique_ptr<ExprAST> LHS)
 		RHS = Rval_And_Prime(std::move(LHS));
 
 		expr = std::make_unique<BinaryExprAST>(std::move(Op_Token), std::move(LHS_Prime), std::move(RHS));
+		
 		break;
 	}
 	default:
@@ -3456,7 +3479,7 @@ static void parser()
 		}
 
 		// AST Printer
-		// root->to_string("", "Program", false);
+		root->to_string("", "Program", false);
 	}
 	catch (const std::exception &e)
 	{
@@ -3529,7 +3552,7 @@ int main(int argc, char **argv)
 		errs() << "Could not open file: " << EC.message();
 		return 1;
 	}
-	// TheModule->print(errs(), nullptr); // print IR to terminal#
+	TheModule->print(errs(), nullptr); // print IR to terminal#
 
 	/**
 	 * Output any compiler warnings that didn't result in a crash, but may result in undesierable behaivour.

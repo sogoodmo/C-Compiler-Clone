@@ -1,13 +1,10 @@
 ; ModuleID = 'mini-c'
 source_filename = "mini-c"
 
-declare void @no_arg(i32)
-
-define i32 @test_func() {
+define i32 @add() {
 entry:
-  %x = alloca i32, align 4
-  %x1 = load i32, i32 0, align 4
-  %addtmp = add i32 1, %x1
-  store i32 %addtmp, ptr %x, align 4
-  %calltmp = call void @no_arg(i32 3)
+  %righttest = alloca i32, align 4
+  store i32 -4, ptr %righttest, align 4
+  %righttest1 = load i32, ptr %righttest, align 4
+  ret i32 %righttest1
 }

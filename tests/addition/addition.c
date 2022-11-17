@@ -1,12 +1,58 @@
 // MiniC program to test addition
-extern void no_arg(int y);
 
-int test_func(void)
+int add()
 {
-	int x;
-	x = x + 1;
+	// int addtest;
+	// int subtest;
+	// int multest;
+	// int divtest;
+	// int modtest;
 
-	no_arg(3.2);
+	int righttest;
+
+	// bool andtest;
+	// bool ortest;
+	// bool eqtest;
+	// bool netest;
+	// bool ltetest;
+	// bool lttest;
+	// bool gtetest;
+	// bool gttest;
+
+	righttest = 4 - 5 - 3;
+
+	// addtest = 1 + 10;
+	// subtest = 1 - 10 ;
+	// multest = 1 * 10;
+	// divtest = 1 / 10;
+	// modtest = 1 % 10;
+
+	// andtest = 1 && 10;
+	// ortest = 1 || 10;
+	// eqtest = 1 == 10;
+	// netest = 1 != 10;
+	// ltetest = 1 <= 10;
+	// lttest = 1 < 10;
+	// gtetest = 1 >= 10;
+	// gttest = 1 > 10;
+
+	return righttest;
+
+	//If's work 
+	// if (banana == 11){
+	// 	banana = banana + 1; 
+	// }
+
+	// if (banana != 12){
+	// 	banana;
+	// }else{
+	// 	banana = banana + 1;
+	// }
+
+	// while (banana > 5){
+	// 	banana = banana - 1;
+	// }
+
 }
 
 	// bool local_bool;
