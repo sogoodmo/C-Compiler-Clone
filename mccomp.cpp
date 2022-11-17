@@ -55,6 +55,7 @@ static std::vector<std::unordered_map<std::string, llvm::AllocaInst *>> ScopedNa
 static std::unordered_map<std::string, llvm::GlobalVariable *> GlobalVariables;
 static std::unordered_set<std::string> UndefinedVars;
 static bool IfPathsReturn = false; 
+static bool IfStmtLast = false; 
 
 // Global variable to check if adding a new scope is due to a function, or braces. 
 bool isFuncBlock = true; 
@@ -1169,12 +1170,20 @@ public:
 			 * We must also stop the IR Generation of anymore lines of code, so Clang doesn't throw an error. 
 			 */
 			auto returnStmt = dynamic_cast<ReturnAST*>(stmt.get());
+
+
+			// JUST NEED TO GET THIS FIXED 
+			// CAN BE FIXED SPLITTING UP FILES 
+			// 
+			// Used to keep track if an ifstmt was the last stmt in the block 
+			// In case the IF is guranteed to return a value & there are lines of code proceeding it (In which case a warning should be thrown)			
+			// IfStmtLast = dynamic_cast<IfAST*>(stmt.get()) != nullptr;
+
 			if (returnStmt != nullptr){
 				if (stmtListIdx != StmtList.size() - 1){
 					addReturnWarning(returnStmt->getRetTok().lineNo, returnStmt->getRetTok().columnNo);
 				}
 				stmt->codegen();
-
 				// Just returning any non-null value 
 				return ConstantInt::get(TheContext, APInt(1, 0, false));
 			}
@@ -1901,7 +1910,9 @@ public:
 		 * Need to create empty return value if a if-statement will gurantee a return from a function.
 		 */
 		if (IfPathsReturn && !FuncContainsReturn){
-			Warnings.push_back(Warning("\033[0;33mWarning:\033[0m Any code after if-statement will not be executed in Function: "+Ident.lexeme, Ident.lineNo, Ident.columnNo));
+			if (!IfStmtLast){
+				Warnings.push_back(Warning("\033[0;33mWarning:\033[0m Any code after if-statement will not be executed in Function: "+Ident.lexeme, Ident.lineNo, Ident.columnNo));
+			}
 			
 			if (FuncReturnType->isVoidTy())
 			{
@@ -3640,7 +3651,7 @@ static void parser()
 		}
 
 		// AST Printer
-		// root->to_string("", "Program", false);
+		root->to_string("", "Program", false);
 	}
 	catch (const std::exception &e)
 	{
