@@ -1,7 +1,21 @@
 // MiniC program to test addition
 
-int add()
+bool add(int x)
 {
+	int y;
+	y = -1;
+	return -1 > 1;
+	// if (-1 > 1)
+	// {
+	// 	return 1;
+	// }
+	// else
+	// {
+	// 	return 5;
+	// }
+
+	// return 0;
+}
 	// int addtest;
 	// int subtest;
 	// int multest;
@@ -38,13 +52,6 @@ int add()
 
 	// return righttest;
 
-	int x;
-	x = 10;
-	while (x > 1){
-		x = x - 1;
-	}
-	return x;
-
 	//If's work 
 	// if (banana == 11){
 	// 	banana = banana + 1; 
@@ -60,7 +67,7 @@ int add()
 	// 	banana = banana - 1;
 	// }
 
-}
+// }
 
 	// bool local_bool;
 	// int local_int;

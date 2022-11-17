@@ -55,6 +55,10 @@ static std::vector<std::unordered_map<std::string, llvm::AllocaInst *>> ScopedNa
 static std::unordered_map<std::string, llvm::GlobalVariable *> GlobalVariables;
 static std::unordered_set<std::string> UndefinedVars;
 
+// Global variable to check if adding a new scope is due to a function, or braces. 
+bool isFuncBlock = true; 
+
+
 /**
  * Class to store warnings, but not crash program
  */
@@ -90,7 +94,7 @@ public:
 
 	virtual const char *what() const throw()
 	{
-		static std::string errMessage("Semantic Error: " + Err + " Line: " + std::to_string(line) + " Col: " + std::to_string(col));
+		static std::string errMessage("\033[0;31mSemantic Error:\033[0m " + Err + " Line: " + std::to_string(line) + " Col: " + std::to_string(col));
 
 		return errMessage.c_str();
 	}
@@ -121,29 +125,6 @@ bool mapContainsKey(std::unordered_map<K, V> &map, K key)
 	return true;
 }
 
-/**
- * @brief Checks every level of scope for a decleration of the given variable,
- * If found, it updates it's alloca to be one of the new value
- *
- * @param newVal New value of variable
- * @param ident Name of variable
- * @param scopeIdx The depth of scope the variable was first assigned
- */
-void UpdateParentScopeValues(llvm::Value *newVal, std::string ident, int scopeIdx)
-{
-
-	for (int i = 0; i < scopeIdx; i++)
-	{
-		if (mapContainsKey(ScopedNamedValues[i], ident))
-		{
-			llvm::AllocaInst *alloca = ScopedNamedValues[i].at(ident);
-
-			Builder.CreateStore(newVal, alloca);
-
-			ScopedNamedValues[i][ident] = alloca;
-		}
-	}
-}
 
 FILE *pFile;
 
@@ -645,6 +626,32 @@ const std::string TypeToStr(VAR_TYPE type)
 	}
 }
 
+/**
+ * @brief Converts the LLVM Type into human readable string. 
+ * 
+ * @param type 
+ * @return const std::string 
+ */
+const std::string llvmTypeToStr(llvm::Type *type){
+	if (type->isFloatTy())
+	{
+		return "float";
+	} 
+	else if (type->isIntegerTy(1))
+	{
+		return "bool";
+	}
+	else if (type->isIntegerTy(32))
+	{
+		return "int";
+	}
+	else if (type->isVoidTy())
+	{
+		return "void";
+	}
+	return "";
+}
+
 // Create an alloca instruction in the entry block of the function.
 // This is used for mutable variables etc.
 static llvm::AllocaInst *CreateEntryBlockAlloca(Function *TheFunction, const std::string &VarName, llvm::Type *type)
@@ -679,6 +686,38 @@ static llvm::Value *GetBool(llvm::Value *val, llvm::Type *type, std::string loop
 }
 
 /**
+ * @brief Add a warning to the buffer if a return has been written and there are lines following it in the same block.
+ * 
+ */
+void addReturnWarning(int line, int col){
+	Warnings.push_back(Warning("\033[0;33mWarning:\033[0m Return statement will cause it's following lines to not be executed", line, col));
+}
+
+/**
+ * @brief 
+ * Checks if the variable has already been defined- if it has a warning is thrown.
+ * 
+ * Then it returns the stored object
+ * 
+ * @tparam T GlobalAlloca or Normal Alloca
+ * @param alloca The alloca we want to load  
+ * @param llvmType The type of the variable 
+ * @param ident The name of the variable  
+ * @return llvm::Value* 
+ */
+template <typename T>
+llvm::Value *CheckDefinedAndLoad(T alloca, llvm::Type *llvmType, TOKEN Ident)
+{
+	if (UndefinedVars.count(Ident.lexeme) != 0)
+	{
+		UndefinedVars.erase(Ident.lexeme);
+		Warnings.push_back(Warning("\033[0;33mWarning:\033[0m Referencing undefined variable. Using default value", Ident.lineNo, Ident.columnNo));
+	}
+
+	return Builder.CreateLoad(llvmType, alloca, Ident.lexeme.c_str());
+}
+
+/**
  * @brief Adds warning to warning buffer if attempting to implicitly convert and may lose precision
  * Returns new value after conversion.
  *
@@ -700,21 +739,21 @@ static llvm::Value *ImplicitCasting(llvm::Value *val, llvm::Type *newType, TOKEN
 	// Float -> Int Conversion - Precision Loss
 	if (oldType->isFloatTy() && newType->isIntegerTy(32))
 	{
-		Warnings.push_back(Warning("Warning: Implict conversion from Float to Int32. May lose precision" + optionalError, tokInfo.lineNo, tokInfo.columnNo));
+		Warnings.push_back(Warning("\033[0;33mWarning:\033[0m Implict conversion from Float to Int32. May lose precision" + optionalError, tokInfo.lineNo, tokInfo.columnNo));
 		return Builder.CreateFPToSI(val, newType, tokInfo.lexeme.c_str());
 	}
 
 	// Float -> Bool Conversion - Precision Loss
 	if (oldType->isFloatTy() && newType->isIntegerTy(1))
 	{
-		Warnings.push_back(Warning("Warning: Implict conversion from Bool to Float. May lose precision" + optionalError, tokInfo.lineNo, tokInfo.columnNo));
+		Warnings.push_back(Warning("\033[0;33mWarning:\033[0m Implict conversion from Bool to Float. May lose precision" + optionalError, tokInfo.lineNo, tokInfo.columnNo));
 		return Builder.CreateFCmpONE(val, ConstantFP::get(TheContext, APFloat(0.0f)), tokInfo.lexeme.c_str());
 	}
 
 	// Int -> Bool Conversion - Precision Loss
 	if (oldType->isIntegerTy(32) && newType->isIntegerTy(1))
 	{
-		Warnings.push_back(Warning("Warning: Implict conversion from Int32 to Bool. May lose precision" + optionalError, tokInfo.lineNo, tokInfo.columnNo));
+		Warnings.push_back(Warning("\033[0;33mWarning:\033[0m Implict conversion from Int32 to Bool. May lose precision" + optionalError, tokInfo.lineNo, tokInfo.columnNo));
 		return Builder.CreateICmpNE(val, ConstantInt::get(Type::getInt32Ty(TheContext), 0), tokInfo.lexeme.c_str());
 	}
 
@@ -737,7 +776,7 @@ static llvm::Value *ImplicitCasting(llvm::Value *val, llvm::Type *newType, TOKEN
 	{
 
 		// Warnings.push_back(Warning("Warning: Implict conversion from Bool to Int32. May result in unexpected behaivour" + optionalError, tokInfo.lineNo, tokInfo.columnNo));
-		return Builder.CreateIntCast(val, newType, true, tokInfo.lexeme.c_str());
+		return Builder.CreateIntCast(val, newType, false, tokInfo.lexeme.c_str());
 	}
 
 	throw SemanticException("Unexpected Type. Expected int, bool or float.", tokInfo.lineNo, tokInfo.columnNo);
@@ -835,52 +874,17 @@ public:
 		{
 			if (mapContainsKey(ScopedNamedValues[i], Ident.lexeme))
 			{
-
 				llvm::AllocaInst *alloca = ScopedNamedValues[i].at(Ident.lexeme);
-
-				if (UndefinedVars.count(Ident.lexeme) != 0)
-				{
-					UndefinedVars.erase(Ident.lexeme);
-
-					Warnings.push_back(Warning("Warning: Referencing undefined variable. Using default value", Ident.lineNo, Ident.columnNo));
-					return Builder.CreateLoad(alloca->getAllocatedType(), Constant::getNullValue(alloca->getAllocatedType()), Ident.lexeme.c_str());
-				}
-				return Builder.CreateLoad(alloca->getAllocatedType(), alloca, Ident.lexeme.c_str());
+				return CheckDefinedAndLoad(alloca, alloca->getAllocatedType(), Ident);
 			}
 		}
+		
 
 		if (mapContainsKey(GlobalVariables, Ident.lexeme))
 		{
 			GlobalVariable *globalAlloca = GlobalVariables.at(Ident.lexeme);
-
-			if (UndefinedVars.count(Ident.lexeme) != 0)
-			{
-				UndefinedVars.erase(Ident.lexeme);
-				Warnings.push_back(Warning("Warning: Referencing undefined global variable. Using default value", Ident.lineNo, Ident.columnNo));
-				return Builder.CreateLoad(globalAlloca->getValueType(), Constant::getNullValue(globalAlloca->getValueType()), Ident.lexeme.c_str());
-			}
-			return Builder.CreateLoad(globalAlloca->getValueType(), globalAlloca, Ident.lexeme.c_str());
+			return CheckDefinedAndLoad(globalAlloca, globalAlloca->getValueType(), Ident);
 		}
-
-		// for (int i = ScopedNamedValues.size() - 1; i > -1; i--)
-		// {
-		// 	if (mapContainsKey(ScopedNamedValues[i], Ident.lexeme))
-		// 	{
-
-		// 		llvm::AllocaInst *alloca = ScopedNamedValues[i].at(Ident.lexeme);
-		// 		V = Builder.CreateLoad(alloca->getAllocatedType(), alloca, Ident.lexeme.c_str());
-
-		// 		return V;
-		// 	}
-		// }
-
-		// if (mapContainsKey(GlobalVariables, Ident.lexeme))
-		// {
-		// 	GlobalVariable *globalAlloca = GlobalVariables.at(Ident.lexeme);
-		// 	V = Builder.CreateLoad(globalAlloca->getValueType(), globalAlloca, Ident.lexeme.c_str());
-
-		// 	return V;
-		// }
 
 		throw SemanticException("Undecleared variable referenced. Perhaps your variable is out of scope?", Ident.lineNo, Ident.columnNo);
 	};
@@ -914,6 +918,7 @@ public:
 	{
 		bool isGlobal = ScopedNamedValues.size() == 0;
 		llvm::Type *llvmType = TypeToLLVM(Type, Ident);
+		
 
 		if (isGlobal)
 		{
@@ -922,10 +927,9 @@ public:
 				throw SemanticException("Cannot redeclare global variable.", Ident.lineNo, Ident.columnNo);
 			}
 
+			auto G = new GlobalVariable(*(TheModule.get()), llvmType, false, GlobalValue::CommonLinkage, Constant::getNullValue(llvmType), Ident.lexeme);
+
 			UndefinedVars.insert(Ident.lexeme);
-
-			auto G = new GlobalVariable(*(TheModule.get()), llvmType, false, GlobalValue::CommonLinkage, nullptr, Ident.lexeme);
-
 			GlobalVariables.insert({Ident.lexeme, G});
 		}
 		else
@@ -933,13 +937,15 @@ public:
 			if (mapContainsKey(ScopedNamedValues.back(), Ident.lexeme))
 			{
 				throw SemanticException("Cannot redeclare variable within same scope.", Ident.lineNo, Ident.columnNo);
-			}
+			}	
+
+			Function *TheFunction = Builder.GetInsertBlock()->getParent();
+
+			AllocaInst *alloca = CreateEntryBlockAlloca(TheFunction, Ident.lexeme, llvmType); 
+			Builder.CreateStore(Constant::getNullValue(llvmType), alloca);
 
 			UndefinedVars.insert(Ident.lexeme);
-
-			auto A = Builder.CreateAlloca(llvmType, nullptr, Ident.lexeme);
-
-			ScopedNamedValues.back().insert({Ident.lexeme, A});
+			ScopedNamedValues.back().insert({Ident.lexeme, alloca});
 		}
 
 		return nullptr;
@@ -975,7 +981,7 @@ public:
 	 *
 	 * Finally we must store the fact that the variable is no longer undefined.
 	 *
-	 * @return llvm::Value* Nullptr as assigning a variable doesn't return a value
+	 * @return llvm::Value* The value of the variable as it may be used as `x=y=z` and needs to propogated
 	 */
 	llvm::Value *codegen() override
 	{
@@ -992,13 +998,11 @@ public:
 				CastedValue = ImplicitCasting(E, alloca->getAllocatedType(), Ident);
 
 				Builder.CreateStore(CastedValue, alloca);
-				ScopedNamedValues[i][Ident.lexeme] = alloca;
 
+				ScopedNamedValues[i][Ident.lexeme] = alloca;
 				UndefinedVars.erase(Ident.lexeme);
-				// Finally check if this variable has been assigned a value higher up in scope
-				// And update the value of the variable at that scope
-				UpdateParentScopeValues(CastedValue, Ident.lexeme, i);
-				return nullptr;
+
+				return CastedValue;
 			}
 		}
 
@@ -1018,7 +1022,7 @@ public:
 			GlobalVariables[Ident.lexeme] = globalAlloca;
 
 			UndefinedVars.erase(Ident.lexeme);
-			return nullptr;
+			return CastedValue;
 		}
 
 		throw SemanticException("Undecleared variable referenced. Perhaps your variable is out of scope?", Ident.lineNo, Ident.columnNo);
@@ -1028,7 +1032,74 @@ public:
 /// =================================== !! Variable's END !! ================================================ ///
 
 /// =================================== !! Block & Statements Start !! ================================================ ///
-#pragma region
+class ReturnAST : public StmtAST
+{
+	std::unique_ptr<ExprAST> ReturnExpr;
+	TOKEN returnTok; 
+
+public:
+	ReturnAST(std::unique_ptr<ExprAST> ReturnExpr, TOKEN returnTok)
+		: ReturnExpr(std::move(ReturnExpr)), returnTok(std::move(returnTok)) {}
+
+	virtual void to_string(const std::string &prefix, const std::string &nodeStr, bool isLeft) const override
+	{
+		std::cout << prefix;
+
+		std::cout << (isLeft ? "├──" : "└──");
+
+		std::cout << "Return" << std::endl;
+
+		if (ReturnExpr != nullptr)
+		{
+			ReturnExpr->to_string(prefix + (isLeft ? "│   " : "    "), "", false);
+		}
+	};
+
+	/**
+	 * @brief Create a return llvm object if it exists in the code. 
+	 * 
+	 * Must check if the return type is equal to the type of the function.
+	 * 
+	 * @return llvm::Value* 
+	 */
+	llvm::Value *codegen() override
+	{	
+		
+		llvm::Type *FuncReturnType = Builder.getCurrentFunctionReturnType();
+
+		if (ReturnExpr != nullptr)
+		{
+			llvm::Value *RetValue = ReturnExpr->codegen(); 
+			
+			if (RetValue->getType() != FuncReturnType)
+			{
+				throw SemanticException("Incorrect Function Return Type. Expected: " + llvmTypeToStr(RetValue->getType()) + " Got: " + llvmTypeToStr(FuncReturnType), returnTok.lineNo, returnTok.columnNo);
+			}
+
+			Builder.CreateRet(RetValue);
+		}
+		else
+		{
+			if (!(FuncReturnType->isVoidTy()))
+			{
+				throw SemanticException("Incorrect Function Return Type. Expected: " + llvmTypeToStr(FuncReturnType) + " Got: void", returnTok.lineNo, returnTok.columnNo);
+			}
+			Builder.CreateRetVoid();
+		}
+		return nullptr;
+	};
+
+	/**
+	 * @brief Get the token of the return object.
+	 * 
+	 * @return TOKEN 
+	 */
+	TOKEN getRetTok()
+	{
+		return returnTok;
+	}
+};
+
 class BlockAST : public StmtAST
 {
 	std::vector<std::unique_ptr<VariableDeclAST>> VarDecls;
@@ -1060,28 +1131,66 @@ public:
 	/**
 	 * @brief When we enter a new scope, we must create a new unordered_map for strings to allocas
 	 * Then once this scope is exited, we destroy any variables that are now out of scope
+	 * 
+	 * We must also check if we havn't created any local scopes yet- as we may redeclare function arguments within the body. This isn't allowed by c99 standards 
 	 *
 	 */
 	llvm::Value *codegen() override
 	{
+		bool addScope = !isFuncBlock;
 
-		ScopedNamedValues.push_back(std::unordered_map<std::string, llvm::AllocaInst *>());
-
+		// If this block is called from a function defintion
+		// We must NOT add a layer of scope (As it has already been add for arguments)
+		// We must also flip the flag, to allow any subsequent calls to BlockCodeGen create a layer of scope
+		if (addScope)
+		{
+			ScopedNamedValues.push_back(std::unordered_map<std::string, llvm::AllocaInst *>());
+		}
+		else
+		{
+			isFuncBlock = false;
+		}
+		
 		for (auto &varDecl : VarDecls)
 		{
 			varDecl->codegen();
 		}
 
+		int stmtListIdx = 0;
 		for (auto &stmt : StmtList)
-		{
-			stmt->codegen();
+		{	
+			/**
+			 * Try to cast our stmt to a return statement 
+			 * 
+			 * If succesfull we must return warnings about following lines not being executed
+			 * GIVEN there exists more lines of code. 
+			 * 
+			 * We must also stop the IR Generation of anymore lines of code, so Clang doesn't throw an error. 
+			 */
+			auto returnStmt = dynamic_cast<ReturnAST*>(stmt.get());
+			if (returnStmt != nullptr){
+				if (stmtListIdx != StmtList.size() - 1){
+					addReturnWarning(returnStmt->getRetTok().lineNo, returnStmt->getRetTok().columnNo);
+				}
+				stmt->codegen();
+				break;
+			}
+			else
+			{
+				stmt->codegen();
+			}
+
+			stmtListIdx++;
 		}
 
-		ScopedNamedValues.pop_back();
+		if (addScope){
+			ScopedNamedValues.pop_back();
+		}
 		return nullptr;
 	};
 };
 
+#pragma region
 class IfAST : public StmtAST
 {
 	std::unique_ptr<ExprAST> ConditionExpr;
@@ -1202,6 +1311,16 @@ public:
 		}
 	};
 
+	/**
+	 * @brief Generate 3 branches. The loop header, loop block and loop continue 
+	 * 
+	 * Then create a conditional branch depending on the loop condition (Which is evalualted in the loop header)
+	 * Within the loop body, unconditionally branch to the loop header, this will re-evalulate the condition and correctly exeucte the loop 
+	 * 
+	 * Then continue the remaining code 
+	 * 
+	 * @return llvm::Value* 
+	 */
 	llvm::Value *codegen() override
 	{
 		llvm::Value *CondValue;
@@ -1241,48 +1360,6 @@ public:
 	};
 };
 
-class ReturnAST : public StmtAST
-{
-	std::unique_ptr<ExprAST> ReturnExpr;
-
-public:
-	ReturnAST(std::unique_ptr<ExprAST> ReturnExpr)
-		: ReturnExpr(std::move(ReturnExpr)) {}
-
-	virtual void to_string(const std::string &prefix, const std::string &nodeStr, bool isLeft) const override
-	{
-		std::cout << prefix;
-
-		std::cout << (isLeft ? "├──" : "└──");
-
-		std::cout << "Return" << std::endl;
-
-		if (ReturnExpr != nullptr)
-		{
-			ReturnExpr->to_string(prefix + (isLeft ? "│   " : "    "), "", false);
-		}
-	};
-
-	/**
-	 * @brief Create a return llvm object if it exists in the code. 
-	 * 
-	 * @return llvm::Value* 
-	 */
-	llvm::Value *codegen() override
-	{	
-		if (ReturnExpr != nullptr)
-		{
-			llvm::Value *RetValue = ReturnExpr->codegen(); 
-			Builder.CreateRet(RetValue);
-		}
-		else
-		{
-			Builder.CreateRetVoid();
-		}
-
-		return nullptr;
-	};
-};
 #pragma endregion
 /// =================================== !! Block & Stmts End !! ================================================ ///
 
@@ -1362,10 +1439,11 @@ public:
 		switch (Op.type)
 		{
 		case AND:
-			BinExprVal = Builder.CreateLogicalAnd(CastedLHS, CastedRHS, "andtmp");
+			BinExprVal = Builder.CreateAnd(CastedLHS, CastedRHS, "andtmp");
 			break;
 		case OR:
-			BinExprVal = Builder.CreateLogicalOr(CastedLHS, CastedRHS, "iortmp");
+			BinExprVal = Builder.CreateOr(CastedLHS, CastedRHS, "ortmp");
+			// BinExprVal = Builder.CreateLogicalOr(CastedLHS, CastedRHS, iortmp");
 			break;
 		case PLUS:
 			if (HighestPrecisionType->isFloatTy())
@@ -1457,9 +1535,13 @@ public:
 			{
 				BinExprVal = Builder.CreateFCmpOLE(CastedLHS, CastedRHS, "flteqtmp");
 			}
-			else
+			else if (HighestPrecisionType->isIntegerTy(1))
 			{
-				BinExprVal = Builder.CreateICmpULE(CastedLHS, CastedRHS, "ilteqtmp");
+				BinExprVal = Builder.CreateICmpULE(CastedLHS, CastedRHS, "blteqtmp");
+			}
+			else if (HighestPrecisionType->isIntegerTy(32))
+			{
+				BinExprVal = Builder.CreateICmpSLE(CastedLHS, CastedRHS, "ilteqtmp");
 			}
 
 			break;
@@ -1468,9 +1550,13 @@ public:
 			{
 				BinExprVal = Builder.CreateFCmpOLT(CastedLHS, CastedRHS, "flttmp");
 			}
-			else
+			else if (HighestPrecisionType->isIntegerTy(1))
 			{
-				BinExprVal = Builder.CreateICmpULT(CastedLHS, CastedRHS, "ilttmp");
+				BinExprVal = Builder.CreateICmpULT(CastedLHS, CastedRHS, "blttmp");
+			}
+			else if (HighestPrecisionType->isIntegerTy(32))
+			{
+				BinExprVal = Builder.CreateICmpSLT(CastedLHS, CastedRHS, "ilttmp");
 			}
 
 			break;
@@ -1479,9 +1565,13 @@ public:
 			{
 				BinExprVal = Builder.CreateFCmpOGE(CastedLHS, CastedRHS, "fgteqtmp");
 			}
-			else
+			else if (HighestPrecisionType->isIntegerTy(1))
 			{
-				BinExprVal = Builder.CreateICmpUGE(CastedLHS, CastedRHS, "igteqtmp");
+				BinExprVal = Builder.CreateICmpUGE(CastedLHS, CastedRHS, "bgteqtmp");
+			}
+			else if (HighestPrecisionType->isIntegerTy(32))
+			{
+				BinExprVal = Builder.CreateICmpSGE(CastedLHS, CastedRHS, "igteqtmp");
 			}
 
 			break;
@@ -1490,9 +1580,13 @@ public:
 			{
 				BinExprVal = Builder.CreateFCmpOGT(CastedLHS, CastedRHS, "fgttmp");
 			}
-			else
+			else if (HighestPrecisionType->isIntegerTy(1))
 			{
-				BinExprVal = Builder.CreateICmpUGT(CastedLHS, CastedRHS, "igttmp");
+				BinExprVal = Builder.CreateICmpUGT(CastedLHS, CastedRHS, "bgttmp");
+			}
+			else if (HighestPrecisionType->isIntegerTy(32))
+			{
+				BinExprVal = Builder.CreateICmpSGT(CastedLHS, CastedRHS, "Igttmp");
 			}
 
 			break;
@@ -1534,27 +1628,38 @@ public:
 		llvm::Value *E = Expr->codegen();
 		llvm::Value *UnaryExpr;
 		llvm::Value *CastedValue = E;
-
 		switch (Op.type)
 		{
 		case MINUS:
 			// Only need to cast a -foo if `foo` is a boolean.
 			// Since -int and -float are semantically correct
-			if (E->getType() == IntegerType::getInt1Ty(TheContext))
+			if (E->getType()->isIntegerTy(1))
 			{
-				CastedValue = ImplicitCasting(E, IntegerType::getInt32Ty(TheContext), Op);
+				CastedValue = ImplicitCasting(E, IntegerType::getInt1Ty(TheContext), Op);
+				UnaryExpr = Builder.CreateNeg(CastedValue, "bminustmp");
 			}
-			std::cout << "FUCKER MOTHER" << std::endl;
-			UnaryExpr = Builder.CreateNeg(CastedValue, "minustmp");
+			else if (E->getType()->isIntegerTy(32))
+			{
+				UnaryExpr = Builder.CreateNeg(E, "fminustmp");
+			}
+			else if (E->getType()->isFloatTy())
+			{
+				UnaryExpr = Builder.CreateFNeg(E, "iminustmp");
+			}
+
 			break;
 		case NOT:
 			// Must cast both an int and a float to bool before we apply negation to it
 			if (E->getType() != IntegerType::getInt1Ty(TheContext))
 			{
 				CastedValue = ImplicitCasting(E, IntegerType::getInt1Ty(TheContext), Op);
+				UnaryExpr = Builder.CreateNot(CastedValue, "finottmp");
+			}
+			else
+			{
+				UnaryExpr = Builder.CreateNot(E, "nottmp");
 			}
 
-			UnaryExpr = Builder.CreateNot(CastedValue, "nottmp");
 			break;
 		default:
 			throw SemanticException("Unexepected unary operator", Op.lineNo, Op.columnNo);
@@ -1704,6 +1809,7 @@ public:
 		std::vector<llvm::Type *> Args;
 
 		Function *ExternFuncDef = TheModule->getFunction(Ident.lexeme);
+		
 
 		/**
 		 * Generating IR for function Prototype if it doesn't already exist
@@ -1743,21 +1849,24 @@ public:
 			}
 		}
 
-		// Create a new level of scope
-		std::unordered_map<std::string, llvm::AllocaInst *> FuncScope;
-		ScopedNamedValues.push_back(FuncScope);
 
 		BasicBlock *BB = BasicBlock::Create(TheContext, "entry", FuncDef);
 		Builder.SetInsertPoint(BB);
 
+
+		// Create a new level of scope
+		std::unordered_map<std::string, llvm::AllocaInst *> FuncScope;
+		ScopedNamedValues.push_back(FuncScope);
 
 		for (auto &Arg : FuncDef->args())
 		{
 			llvm::AllocaInst *Alloca = CreateEntryBlockAlloca(FuncDef, Arg.getName().data(), Arg.getType());
 			Builder.CreateStore(&Arg, Alloca);
 
-			ScopedNamedValues.back()[std::string(Arg.getName())] = Alloca;
+			ScopedNamedValues.back()[Arg.getName().data()] = Alloca;
 		}
+
+		isFuncBlock = true; 
 
 		FuncBlock->codegen();
 		llvm::verifyFunction(*FuncDef);
@@ -2011,7 +2120,7 @@ static void Match(TOKEN_TYPE expectedTokenType, string errMessage, const char *p
 {
 	if (CurTok.type != expectedTokenType)
 	{
-		throw ParseException("Invalid Token Error: " + errMessage);
+		throw ParseException("\033[0;31mInvalid Token Error:\033[0m " + errMessage);
 	}
 	getNextToken();
 }
@@ -2822,14 +2931,17 @@ static std::unique_ptr<ExprAST> Expr()
 static std::unique_ptr<ReturnAST> Return_Stmt_Prime()
 {
 	std::unique_ptr<ExprAST> expr;
-
+	TOKEN returnTok; 
 	if (ValidExprStart())
 	{
 		expr = Expr();
+
+		returnTok = CurTok;
 		Match(SC, "Expected ';' after return expression. ");
 	}
 	else if (CurTok.type == SC)
 	{
+		returnTok = CurTok;
 		Match(SC, "Expected ';' after return keyword. ");
 	}
 	else
@@ -2837,7 +2949,7 @@ static std::unique_ptr<ReturnAST> Return_Stmt_Prime()
 		throw ParseException("Invalid Token Error: \nExpected: Start of expression. ");
 	}
 
-	return std::make_unique<ReturnAST>(std::move(expr));
+	return std::make_unique<ReturnAST>(std::move(expr), std::move(returnTok));
 }
 
 // return_stmt ::= "return" return_stmt_prime
@@ -3476,7 +3588,7 @@ static void parser()
 		}
 
 		// AST Printer
-		root->to_string("", "Program", false);
+		// root->to_string("", "Program", false);
 	}
 	catch (const std::exception &e)
 	{
