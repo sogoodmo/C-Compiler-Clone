@@ -660,7 +660,7 @@ static llvm::AllocaInst *CreateEntryBlockAlloca(Function *TheFunction, const std
  * @param type Type of the value of the expression
  * @return llvm::Value*
  */
-static llvm::Value *GetTypedCoerecedCondition(llvm::Value *val, llvm::Type *type, std::string loopStr)
+static llvm::Value *GetBool(llvm::Value *val, llvm::Type *type, std::string loopStr)
 {
 	if (type->isFloatTy())
 	{
@@ -1126,7 +1126,7 @@ public:
 		llvm::Value *CondValue = ConditionExpr->codegen();
 		llvm::Type *CondType = CondValue->getType();
 
-		CondValue = GetTypedCoerecedCondition(CondValue, CondType, "ifcond");
+		CondValue = GetBool(CondValue, CondType, "ifcond");
 
 		BasicBlock *TrueBB = BasicBlock::Create(TheContext, "then", TheFunction);
 		BasicBlock *ElseBB = BasicBlock::Create(TheContext, "else");
@@ -1204,33 +1204,39 @@ public:
 
 	llvm::Value *codegen() override
 	{
+		llvm::Value *CondValue;
+		llvm::Value *BoolCondValue;
 
 		Function *TheFunction = Builder.GetInsertBlock()->getParent();
-		llvm::Value *CondValue = ConditionExpr->codegen();
-		llvm::Type *CondType = CondValue->getType();
 
-		CondValue = GetTypedCoerecedCondition(CondValue, CondType, "whilecond");
+		BasicBlock *LoopBB = BasicBlock::Create(TheContext, "while");
+		BasicBlock *ContBB = BasicBlock::Create(TheContext, "whilecont");
+		BasicBlock *HeaderBB = BasicBlock::Create(TheContext, "loopcond", TheFunction);
+		
+		// Unconditionally branch to the header and generate condition for the loop
+		Builder.CreateBr(HeaderBB);
+		Builder.SetInsertPoint(HeaderBB);
 
-		BasicBlock *LoopBB = BasicBlock::Create(TheContext, "while", TheFunction);
-		BasicBlock *MergeBB = BasicBlock::Create(TheContext, "whilecont");
+		CondValue = ConditionExpr->codegen();
+		BoolCondValue = GetBool(CondValue, CondValue->getType(), "whilecond");
 
-		Builder.CreateCondBr(CondValue, LoopBB, MergeBB);
+		Builder.CreateCondBr(BoolCondValue, LoopBB, ContBB);
 
-		// Loop
+		// Generate the code that will be looped 
+		TheFunction->getBasicBlockList().push_back(LoopBB);
 		Builder.SetInsertPoint(LoopBB);
+
 		ScopedNamedValues.push_back(std::unordered_map<std::string, llvm::AllocaInst *>());
-
 		LoopBlock->codegen();
-
 		ScopedNamedValues.pop_back();
-		Builder.SetInsertPoint(LoopBB);
-		// Loop
 
-		// Exiting
-		TheFunction->getBasicBlockList().push_back(MergeBB);
-		Builder.CreateBr(MergeBB);
+		//Branch back to checking conditional branch 
+		Builder.CreateBr(HeaderBB);
 
-		Builder.SetInsertPoint(MergeBB);
+
+		// Exiting loop and continuing code 
+		TheFunction->getBasicBlockList().push_back(ContBB);
+		Builder.SetInsertPoint(ContBB);
 		return nullptr;
 	};
 };
@@ -1737,12 +1743,13 @@ public:
 			}
 		}
 
-		BasicBlock *BB = BasicBlock::Create(TheContext, "entry", FuncDef);
-		Builder.SetInsertPoint(BB);
-
 		// Create a new level of scope
 		std::unordered_map<std::string, llvm::AllocaInst *> FuncScope;
 		ScopedNamedValues.push_back(FuncScope);
+
+		BasicBlock *BB = BasicBlock::Create(TheContext, "entry", FuncDef);
+		Builder.SetInsertPoint(BB);
+
 
 		for (auto &Arg : FuncDef->args())
 		{
@@ -2409,20 +2416,18 @@ static std::unique_ptr<ExprAST> Rval_Mul_Prime(std::unique_ptr<ExprAST> LHS)
 // rval_mul ::= rval_neg rval_mul_prime
 static std::unique_ptr<ExprAST> Rval_Mul()
 {
-	std::unique_ptr<ExprAST> LHS;
-	std::unique_ptr<ExprAST> expr;
+	std::unique_ptr<ExprAST> LHS = Rval_Neg();
 
-	if (ValidPresedenceLayer(CurTok.type))
-	{
-		LHS = Rval_Neg();
-		expr = Rval_Mul_Prime(std::move(LHS));
-	}
-	else
-	{
-		throw ParseException("Invalid Token Error: \nExpected: Start of Expression. ");
-	}
+	while (CurTok.type == ASTERIX || CurTok.type == MOD || CurTok.type == DIV){
+		TOKEN op = CurTok;
+		getNextToken();
 
-	return expr;
+		auto RHS = Rval_Neg();
+
+		LHS = std::make_unique<BinaryExprAST>(op, std::move(LHS), std::move(RHS));
+	}
+	
+	return Rval_Mul_Prime(std::move(LHS));
 }
 
 // rval_add_prime ::= "+" rval_mul  | "-" rval_mul | epsilon

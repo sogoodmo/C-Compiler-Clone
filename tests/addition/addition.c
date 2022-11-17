@@ -8,7 +8,7 @@ int add()
 	// int divtest;
 	// int modtest;
 
-	int righttest;
+	// int righttest;
 
 	// bool andtest;
 	// bool ortest;
@@ -19,7 +19,7 @@ int add()
 	// bool gtetest;
 	// bool gttest;
 
-	righttest = 4 - 5 - 3;
+	// righttest = 10 - 3;
 
 	// addtest = 1 + 10;
 	// subtest = 1 - 10 ;
@@ -36,7 +36,14 @@ int add()
 	// gtetest = 1 >= 10;
 	// gttest = 1 > 10;
 
-	return righttest;
+	// return righttest;
+
+	int x;
+	x = 10;
+	while (x > 1){
+		x = x - 1;
+	}
+	return x;
 
 	//If's work 
 	// if (banana == 11){
