@@ -37,12 +37,12 @@ function validate {
 
 echo "Test *****"
 
-cd tests/addition/
-pwd
-rm -rf output.ll add
-"$COMP" ./addition.c
-$CLANG driver.cpp output.ll  -o add
-validate "./add"
+# cd tests/addition/
+# pwd
+# rm -rf output.ll add
+# "$COMP" ./addition.c
+# $CLANG driver.cpp output.ll  -o add
+# validate "./add"
 
 
 cd ../factorial 

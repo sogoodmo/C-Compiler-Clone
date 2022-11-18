@@ -557,6 +557,28 @@ enum VAR_TYPE
 };
 
 /**
+ * @brief Get constant llvm value from a type 
+ * 
+ * @param type The type of the constant
+ * @param signed If the constant is signed or not 
+ * @return llvm::Value* 
+ */
+llvm::Value *GetConstant(VAR_TYPE type, bool isSigned=false)
+{
+	switch (type)
+	{
+		case INT_TYPE:
+			return ConstantInt::get(TheContext, APInt(32, 0, isSigned));
+		case FLOAT_TYPE:
+			return ConstantFP::get(TheContext, APFloat(0.0f));
+		case BOOL_TYPE:
+			return ConstantInt::get(TheContext, APInt(1, 0, isSigned));
+		default:
+			throw SemanticException("",-1,-1);
+	}
+}
+
+/**
  * @brief Returns the matching llvm type for the type passed in.
  *
  * @param type The type of the variable
@@ -1158,18 +1180,10 @@ public:
 			varDecl->codegen();
 		}
 
-		int stmtListIdx = 0;
+		int stmtListIdx = -1;
 		for (auto &stmt : StmtList)
 		{	
-			/**
-			 * Try to cast our stmt to a return statement 
-			 * 
-			 * If succesfull we must return warnings about following lines not being executed
-			 * GIVEN there exists more lines of code. 
-			 * 
-			 * We must also stop the IR Generation of anymore lines of code, so Clang doesn't throw an error. 
-			 */
-			auto returnStmt = dynamic_cast<ReturnAST*>(stmt.get());
+			stmtListIdx++;
 
 
 			// JUST NEED TO GET THIS FIXED 
@@ -1179,15 +1193,25 @@ public:
 			// In case the IF is guranteed to return a value & there are lines of code proceeding it (In which case a warning should be thrown)			
 			// IfStmtLast = dynamic_cast<IfAST*>(stmt.get()) != nullptr;
 
+
+			/**
+			 * If the current statement is a return statement, throw a warning only if it's not the last statement in a block
+			 * 
+			 * Generate the statement and stop generating any more IR- as this code would never be reached
+			 */
+			auto returnStmt = dynamic_cast<ReturnAST*>(stmt.get());
 			if (returnStmt != nullptr){
+
 				if (stmtListIdx != StmtList.size() - 1){
 					addReturnWarning(returnStmt->getRetTok().lineNo, returnStmt->getRetTok().columnNo);
 				}
+
 				stmt->codegen();
-				// Just returning any non-null value 
 				if (addScope){
 					ScopedNamedValues.pop_back();
 				}
+
+				// Just returning any non-null value 
 				return ConstantInt::get(TheContext, APInt(1, 0, false));
 			}
 			else
@@ -1195,7 +1219,6 @@ public:
 				stmt->codegen();
 			}
 
-			stmtListIdx++;
 		}
 
 		if (addScope){
@@ -1425,25 +1448,18 @@ public:
 	llvm::Value *codegen() override
 	{
 		llvm::Value *BinExprVal;
-		llvm::Value *LHSVal = LHS->codegen();
-		llvm::Value *RHSVal = RHS->codegen();
-		llvm::Type *HighestPrecisionType = GetHighestPrecisionType(LHSVal->getType(), RHSVal->getType());
+		llvm::Type *HighestPrecisionType;
 		llvm::Value *CastedLHS;
 		llvm::Value *CastedRHS;
 
 		/**
-		 * AND, OR - We must cast both types to bools. Regardless of what they already are
-		 *
-		 * Correctly coerce the type of the RHS and LHS
-		 *
+		 * Not generating the implicit cast for AND/OR as that will be done 
+		 * Later for the case of lazy evaluation. 
 		 */
-
 		switch (Op.type)
 		{
 		case AND:
 		case OR:
-			CastedLHS = ImplicitCasting(LHSVal, IntegerType::getInt1Ty(TheContext), Op);
-			CastedRHS = ImplicitCasting(RHSVal, IntegerType::getInt1Ty(TheContext), Op);
 			break;
 		case EQ:
 		case NE:
@@ -1456,22 +1472,105 @@ public:
 		case ASTERIX:
 		case DIV:
 		case MOD:
+		{
+			llvm::Value *LHSVal = LHS->codegen();
+			llvm::Value *RHSVal = RHS->codegen();
+
+			HighestPrecisionType = GetHighestPrecisionType(LHSVal->getType(), RHSVal->getType());
+
 			CastedLHS = ImplicitCasting(LHSVal, HighestPrecisionType, Op);
 			CastedRHS = ImplicitCasting(RHSVal, HighestPrecisionType, Op);
 			break;
+		}
 		default:
 			throw SemanticException("Invalid Binary Operator", Op.lineNo, Op.columnNo);
 		}
 
+		// Three blocks LHS,RHS, Continue block
+		// Create a temporary variable
+		// Jump to the LHS and evaluate the expression
+		// OR:
+		// If LHS is false, set the alloca to false and jump to the RHS (set the alloca to the result of the RHS and then jump to continue)
+		// If the LHS is true, set the alloca to true and jump to the continue block
+		// so above two with conditional jump
+
+
+		// AND:
+		// If the LHS is true, set the alloca to false and jump to the RHS
+		// u can figure rest out 
+
+
+		/**
+		 * If we are creating an expression for && or || we can try to apply lazy evaluation 
+		 * 
+		 * We can create basic blocks, and branch to either evaluating the RHS or just continuing the block. 
+		 * Depending on the outcome of the LHS. 
+		 * 
+		 * We just need to store the value in the temporary alloca 
+		 *
+		 */
+		if (Op.type == OR || Op.type == AND)
+		{
+			Function *TheFunction = Builder.GetInsertBlock()->getParent();
+
+			AllocaInst *tmpAlloca = CreateEntryBlockAlloca(TheFunction, "tmpLazy", TypeToLLVM(BOOL_TYPE, Op));
+
+			BasicBlock *LeftBB = BasicBlock::Create(TheContext, "LExpr", TheFunction);
+			BasicBlock *RightBB = BasicBlock::Create(TheContext, "RExpr");
+			BasicBlock *ContBB = BasicBlock::Create(TheContext, "ExprCont");
+
+			Builder.CreateBr(LeftBB);
+			Builder.SetInsertPoint(LeftBB);
+
+			llvm::Value *BoolRHS;
+			llvm::Value *BoolLHS = ImplicitCasting(LHS->codegen(), TypeToLLVM(BOOL_TYPE, Op), Op);
+
+			/**
+			 * If we have (True || ...) -> We don't have to evaluate RHS. So we can branch to the continue block
+			 * If we have (False && ...) -> We don't have to evalaute RHS. So we can branch to the continue block÷
+			 */
+			if (Op.type == OR)
+			{
+				Builder.CreateCondBr(BoolLHS, ContBB, RightBB);
+
+				// Eval RHS- Set tmp to RHS Value 
+				TheFunction->getBasicBlockList().push_back(RightBB);
+				Builder.SetInsertPoint(RightBB);
+
+				BoolRHS = ImplicitCasting(RHS->codegen(), TypeToLLVM(BOOL_TYPE, Op), Op);
+				Builder.CreateStore(BoolRHS, tmpAlloca);
+
+				// Skip Eval RHS- Set tmp to True 
+				TheFunction->getBasicBlockList().push_back(ContBB);
+				Builder.SetInsertPoint(ContBB);
+
+				Builder.CreateStore(ConstantInt::get(TheContext, APInt(1, 1, false)), tmpAlloca);
+	
+				return Builder.CreateLoad(TypeToLLVM(BOOL_TYPE, Op), tmpAlloca, "exprBool");
+			}
+			else if (Op.type == AND)
+			{
+				Builder.CreateCondBr(BoolLHS, RightBB, ContBB);
+
+				// Eval RHS- Set tmp to RHS Value 
+				TheFunction->getBasicBlockList().push_back(RightBB);
+				Builder.SetInsertPoint(RightBB);
+
+				BoolRHS = ImplicitCasting(RHS->codegen(), TypeToLLVM(BOOL_TYPE, Op), Op);
+				Builder.CreateStore(BoolRHS, tmpAlloca);
+
+				// Skip Eval RHS- Set tmp to False 
+				TheFunction->getBasicBlockList().push_back(ContBB);
+				Builder.SetInsertPoint(ContBB);
+
+				Builder.CreateStore(ConstantInt::get(TheContext, APInt(1, 0, false)), tmpAlloca);
+
+				return Builder.CreateLoad(TypeToLLVM(BOOL_TYPE, Op), tmpAlloca, "exprBool");
+			}
+		}
+
 		switch (Op.type)
 		{
-		case AND:
-			BinExprVal = Builder.CreateAnd(CastedLHS, CastedRHS, "andtmp");
-			break;
-		case OR:
-			BinExprVal = Builder.CreateOr(CastedLHS, CastedRHS, "ortmp");
-			// BinExprVal = Builder.CreateLogicalOr(CastedLHS, CastedRHS, iortmp");
-			break;
 		case PLUS:
 			if (HighestPrecisionType->isFloatTy())
 			{
@@ -1662,7 +1761,7 @@ public:
 			// Since -int and -float are semantically correct
 			if (E->getType()->isIntegerTy(1))
 			{
-				CastedValue = ImplicitCasting(E, IntegerType::getInt1Ty(TheContext), Op);
+				CastedValue = ImplicitCasting(E, TypeToLLVM(BOOL_TYPE, Op), Op);
 				UnaryExpr = Builder.CreateNeg(CastedValue, "bminustmp");
 			}
 			else if (E->getType()->isIntegerTy(32))
@@ -1677,9 +1776,9 @@ public:
 			break;
 		case NOT:
 			// Must cast both an int and a float to bool before we apply negation to it
-			if (E->getType() != IntegerType::getInt1Ty(TheContext))
+			if (!E->getType()->isIntegerTy(1))
 			{
-				CastedValue = ImplicitCasting(E, IntegerType::getInt1Ty(TheContext), Op);
+				CastedValue = ImplicitCasting(E, TypeToLLVM(BOOL_TYPE, Op), Op);
 				UnaryExpr = Builder.CreateNot(CastedValue, "finottmp");
 			}
 			else
@@ -1838,7 +1937,6 @@ public:
 
 		Function *ExternFuncDef = TheModule->getFunction(Ident.lexeme);
 		
-
 		/**
 		 * Generating IR for function Prototype if it doesn't already exist
 		 */
@@ -1907,7 +2005,6 @@ public:
 		{
 			throw SemanticException("Not all code paths return value in non-void function.", Ident.lineNo, Ident.columnNo);
 		}
-
 		
 		/**
 		 * Need to create empty return value if a if-statement will gurantee a return from a function.
@@ -1968,6 +2065,11 @@ public:
 		}
 	};
 
+	/**
+	 * @brief Generates the function declerations and all the variable declerations
+	 * 
+	 * @return llvm::Value* 
+	 */
 	llvm::Value *codegen() override
 	{
 		if (FuncDecl != nullptr)
@@ -2008,6 +2110,11 @@ public:
 		}
 	};
 
+	/**
+	 * @brief Genereates all the extern declerations and the function/variable decelerations 
+	 * 
+	 * @return llvm::Value* 
+	 */
 	llvm::Value *codegen() override
 	{
 		for (auto &Extern : ExternList)
@@ -2221,33 +2328,6 @@ static TOKEN PeekToken()
 	return nextToken;
 }
 
-/**
- * @brief Checks if the current token is a valid token for adding a layer of presedence
- *
- * @param type
- * @return true If the next token is valid token for adding a layer of presedence
- * @return false Otherwise
- */
-static bool ValidPresedenceLayer(int type)
-{
-	bool addlayer;
-	switch (type)
-	{
-	case BOOL_LIT:
-	case FLOAT_LIT:
-	case INT_LIT:
-	case LPAR:
-	case NOT:
-	case MINUS:
-	case IDENT:
-		addlayer = true;
-		break;
-	default:
-		addlayer = false;
-		break;
-	}
-	return addlayer;
-}
 
 /**
  * @brief Checks if the current token's type is one of the valid types
@@ -2936,34 +3016,6 @@ static std::unique_ptr<ExprAST> Expr()
 	case IDENT:
 	{
 		TOKEN NextTok = PeekToken();
-
-		// switch (NextTok.type)
-		// {
-		// 	case ASSIGN:
-		// 	{
-		// 		TOKEN ident = GetIdentAndMatch();
-		// 		Match(ASSIGN, "Expected '=' after variable identifer. ");
-
-		// 		auto var_expr = Expr();
-		// 		expr = std::make_unique<VariableAssignmentAST>(std::move(ident), std::move(var_expr));
-		// 		break;
-		// 	}
-		// 	case BOOL_LIT:
-		// 	case FLOAT_LIT:
-		// 	case INT_LIT:
-		// 	case LPAR:
-		// 	case NOT:
-		// 	case MINUS:
-		// 	case IDENT:
-		// 	{
-		// 		expr = Rval_Or();
-		// 		break;
-		// 	}
-		// 	default:
-		// 		std::cout << CurTok.lexeme << " CUR TOK " << CurTok.lineNo << std::endl;
-		// 		std::cout << NextTok.lexeme << " NEXT TOK " << NextTok.lineNo << std::endl;
-		// 		throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS, SC}");
-		// }
 
 		if (NextTok.type == ASSIGN)
 		{
@@ -3690,6 +3742,9 @@ int main(int argc, char **argv)
 	lineNo = 1;
 	columnNo = 1;
 
+	/**
+	 * Lexter that doesn't need to be ran  
+	 */
 	// get the first token
 	// getNextToken();
 	// while (CurTok.type != EOF_TOK) {
