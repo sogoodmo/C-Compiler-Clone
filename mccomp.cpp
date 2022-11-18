@@ -558,22 +558,53 @@ enum VAR_TYPE
 };
 
 /**
- * @brief Get constant llvm value from a type 
- * 
- * @param type The type of the constant
- * @param signed If the constant is signed or not 
- * @return llvm::Value* 
+ * @brief Converts type enum to string
+ *
+ * @param type The type to convert
+ * @return const std::string The string of the converted type
  */
-llvm::Value *GetConstant(VAR_TYPE type, bool isSigned=false)
+const std::string TypeToStr(VAR_TYPE type)
 {
 	switch (type)
 	{
+	case VOID_TYPE:
+		return "void";
+	case INT_TYPE:
+		return "int";
+	case FLOAT_TYPE:
+		return "float";
+	case BOOL_TYPE:
+		return "bool";
+	default:
+		return "";
+	}
+}
+
+/**
+ * @brief Get the constant llvm value from a type and value 
+ * 
+ * @param type The type of the constant
+ * @param Val The value of the constant 
+ * @param signed If the constant is signed or not 
+ * @return llvm::Value* 
+ */
+llvm::Value *GetConstant(VAR_TYPE type, float Val, bool isSigned=false)
+{
+	// Since float is highest precision type
+	// Downcasting won't lose any information.
+	if (type != FLOAT_TYPE)
+	{
+		Val = (int)Val;
+	}
+
+	switch (type)
+	{
 		case INT_TYPE:
-			return ConstantInt::get(TheContext, APInt(32, 0, isSigned));
+			return ConstantInt::get(TheContext, APInt(32, Val, isSigned));
 		case FLOAT_TYPE:
-			return ConstantFP::get(TheContext, APFloat(0.0f));
+			return ConstantFP::get(TheContext, APFloat(Val));
 		case BOOL_TYPE:
-			return ConstantInt::get(TheContext, APInt(1, 0, isSigned));
+			return ConstantInt::get(TheContext, APInt(1, Val, isSigned));
 		default:
 			throw SemanticException("",-1,-1);
 	}
@@ -629,29 +660,6 @@ llvm::Type *GetHighestPrecisionType(llvm::Type *t1, llvm::Type *t2)
 }
 
 /**
- * @brief Converts type enum to string
- *
- * @param type The type to convert
- * @return const std::string The string of the converted type
- */
-const std::string TypeToStr(VAR_TYPE type)
-{
-	switch (type)
-	{
-	case VOID_TYPE:
-		return "void";
-	case INT_TYPE:
-		return "int";
-	case FLOAT_TYPE:
-		return "float";
-	case BOOL_TYPE:
-		return "bool";
-	default:
-		return "";
-	}
-}
-
-/**
  * @brief Converts the LLVM Type into human readable string. 
  * 
  * @param type 
@@ -696,15 +704,15 @@ static llvm::Value *GetBool(llvm::Value *val, llvm::Type *type, std::string loop
 {
 	if (type->isFloatTy())
 	{
-		return Builder.CreateFCmpONE(val, ConstantFP::get(TheContext, APFloat(0.0f)), loopStr);
+		return Builder.CreateFCmpONE(val, GetConstant(FLOAT_TYPE, 0.0f), loopStr);
 	}
 	else if (type->isIntegerTy(32))
 	{
-		return Builder.CreateICmpNE(val, ConstantInt::get(Type::getInt32Ty(TheContext), true), loopStr);
+		return Builder.CreateICmpNE(val, GetConstant(INT_TYPE, 0.0f, true), loopStr);
 	}
 	else if (type->isIntegerTy(1))
 	{
-		return Builder.CreateLogicalOr(val, ConstantInt::get(Type::getInt1Ty(TheContext), 0), loopStr);
+		return Builder.CreateOr(val, GetConstant(BOOL_TYPE, 0.0f, false), loopStr);
 	}
 
 	throw SemanticException("", -1, -1);
@@ -772,14 +780,14 @@ static llvm::Value *ImplicitCasting(llvm::Value *val, llvm::Type *newType, TOKEN
 	if (oldType->isFloatTy() && newType->isIntegerTy(1))
 	{
 		Warnings.push_back(Warning("\033[0;33mWarning:\033[0m Implict conversion from Bool to Float. May lose precision" + optionalError, tokInfo.lineNo, tokInfo.columnNo));
-		return Builder.CreateFCmpONE(val, ConstantFP::get(TheContext, APFloat(0.0f)), tokInfo.lexeme.c_str());
+		return Builder.CreateFCmpONE(val, GetConstant(FLOAT_TYPE, 0.0f), tokInfo.lexeme.c_str());
 	}
 
 	// Int -> Bool Conversion - Precision Loss
 	if (oldType->isIntegerTy(32) && newType->isIntegerTy(1))
 	{
 		Warnings.push_back(Warning("\033[0;33mWarning:\033[0m Implict conversion from Int32 to Bool. May lose precision" + optionalError, tokInfo.lineNo, tokInfo.columnNo));
-		return Builder.CreateICmpNE(val, ConstantInt::get(Type::getInt32Ty(TheContext), 0), tokInfo.lexeme.c_str());
+		return Builder.CreateICmpNE(val, GetConstant(INT_TYPE, 0, true), tokInfo.lexeme.c_str());
 	}
 
 	// Int -> Float Conversion - No Precision Loss
@@ -807,25 +815,8 @@ static llvm::Value *ImplicitCasting(llvm::Value *val, llvm::Type *newType, TOKEN
 	throw SemanticException("Unexpected Type. Expected int, bool or float.", tokInfo.lineNo, tokInfo.columnNo);
 }
 
-// /**
-//  * @brief Generic function to print a vector of ast nodes
-//  *
-//  *
-//  *
-//  * @tparam T Generic type of ASTnode
-//  * @param NodeVec The vector of nodes to print out
-//  * @param prefix The prefix of the vector
-//  * @param isLeft Weather the vector was a left subtree
-//  * @param extraCon Any auxillary conditions to checking if an item is the right subtree
-//  */
-// template <typename T>
-// static void PrintVectorAST(std::vector<std::unique_ptr<T>> NodeVec, const std::string &prefix, bool isLeft, bool extraCon = false)
-// {
-// 	for (int i = 0; i < NodeVec.size(); i++)
-// 	{
-// 		NodeVec[i]->to_string(prefix + (isLeft ? "│   " : "    "), "", (i != NodeVec.size() - 1) || extraCon);
-// 	}
-// }
+
+
 
 // ---- AST Declerations ---- //
 #pragma region
@@ -863,6 +854,124 @@ class ExprAST : public StmtAST
 
 #pragma endregion
 // ---- AST Declerations ---- //
+
+// ---- LAZY EVAL FUNCTIONS ---- // 
+/**
+ * @brief Creates 3 branches when checking LazyOR. Right Branch, Skip Right Branch, Continue Branch
+ * 
+ * We also create a temp alloca
+ * 
+ * If the LHS Expression evaluates to TRUE -> We jump to the skip right branch which sets the value of 
+ * of this temp alloca to TRUE.
+ * 
+ * If the LHS Expression evalautes to FALSE -> We jump to the right branch and set the value of this alloca
+ * to the value of the RHS 
+ * 
+ * Then we return the value of this alloca 
+ * 
+ * @param Op Token info for error info 
+ * @param LHS LHS Of Bin Expression
+ * @param RHS RHS Of Bin Expression 
+ * @return llvm::Value* 
+ */
+llvm::Value* CheckLazyOr(TOKEN Op, std::unique_ptr<ExprAST> LHS, std::unique_ptr<ExprAST> RHS)
+{
+	Function *TheFunction = Builder.GetInsertBlock()->getParent();
+
+	AllocaInst *tmpAlloca = CreateEntryBlockAlloca(TheFunction, "tmpLazy", TypeToLLVM(BOOL_TYPE, Op));
+
+	BasicBlock *RightBB = BasicBlock::Create(TheContext, "RExpr", TheFunction);
+	BasicBlock *SkipRightBB = BasicBlock::Create(TheContext, "SkipRExpr");
+	BasicBlock *ContBB = BasicBlock::Create(TheContext, "Cont");
+
+
+	llvm::Value *BoolRHS;
+	llvm::Value *BoolLHS = ImplicitCasting(LHS->codegen(), TypeToLLVM(BOOL_TYPE, Op), Op);
+
+	Builder.CreateCondBr(BoolLHS, SkipRightBB, RightBB);
+
+	// Eval RHS- Set tmp to RHS Value 
+	TheFunction->getBasicBlockList().push_back(RightBB);
+	Builder.SetInsertPoint(RightBB);
+
+	BoolRHS = ImplicitCasting(RHS->codegen(), TypeToLLVM(BOOL_TYPE, Op), Op);
+	Builder.CreateStore(BoolRHS, tmpAlloca);
+
+	Builder.CreateBr(ContBB);
+
+	// Skip Eval RHS- Set tmp to True 
+	TheFunction->getBasicBlockList().push_back(SkipRightBB);
+	Builder.SetInsertPoint(SkipRightBB);
+
+	Builder.CreateStore(GetConstant(BOOL_TYPE, 1.0f, false), tmpAlloca);
+
+	Builder.CreateBr(ContBB);
+
+	TheFunction->getBasicBlockList().push_back(ContBB);
+	Builder.SetInsertPoint(ContBB);
+
+	return Builder.CreateLoad(TypeToLLVM(BOOL_TYPE, Op), tmpAlloca, "exprBool");
+}
+
+/**
+ * @brief Creates 3 branches when checking LazyAND. Right Branch, Skip Right Branch, Continue Branch
+ * 
+ * We also create a temp alloca
+ * 
+ * If the LHS Expression evaluates to FALSE -> We jump to the skip right branch which sets the value of 
+ * of this temp alloca to FALSE.
+ * 
+ * If the LHS Expression evalautes to TRUE -> We jump to the right branch and set the value of this alloca
+ * to the value of the RHS 
+ * 
+ * Then we return the value of this alloca 
+ * 
+ * @param Op Token info for error info 
+ * @param LHS LHS Of Bin Expression
+ * @param RHS RHS Of Bin Expression 
+ * @return llvm::Value* 
+ */
+llvm::Value *CheckLazyAnd(TOKEN Op, std::unique_ptr<ExprAST> LHS, std::unique_ptr<ExprAST> RHS)
+{
+	Function *TheFunction = Builder.GetInsertBlock()->getParent();
+
+	AllocaInst *tmpAlloca = CreateEntryBlockAlloca(TheFunction, "tmpLazy", TypeToLLVM(BOOL_TYPE, Op));
+
+	BasicBlock *RightBB = BasicBlock::Create(TheContext, "RExpr", TheFunction);
+	BasicBlock *SkipRightBB = BasicBlock::Create(TheContext, "SkipRExpr");
+	BasicBlock *ContBB = BasicBlock::Create(TheContext, "Cont");
+
+
+	llvm::Value *BoolRHS;
+	llvm::Value *BoolLHS = ImplicitCasting(LHS->codegen(), TypeToLLVM(BOOL_TYPE, Op), Op);
+
+	Builder.CreateCondBr(BoolLHS, RightBB, SkipRightBB);
+
+	// Eval RHS- Set tmp to RHS Value 
+	TheFunction->getBasicBlockList().push_back(RightBB);
+	Builder.SetInsertPoint(RightBB);
+
+	BoolRHS = ImplicitCasting(RHS->codegen(), TypeToLLVM(BOOL_TYPE, Op), Op);
+	Builder.CreateStore(BoolRHS, tmpAlloca);
+
+	Builder.CreateBr(ContBB);
+
+	// Skip Eval RHS- Set tmp to False 
+	TheFunction->getBasicBlockList().push_back(SkipRightBB);
+	Builder.SetInsertPoint(SkipRightBB);
+
+	Builder.CreateStore(GetConstant(BOOL_TYPE, 0.0f, false), tmpAlloca);
+
+	Builder.CreateBr(ContBB);
+
+	TheFunction->getBasicBlockList().push_back(ContBB);
+	Builder.SetInsertPoint(ContBB);
+
+	return Builder.CreateLoad(TypeToLLVM(BOOL_TYPE, Op), tmpAlloca, "exprBool");
+}
+// ---- LAZY EVAL FUNCTIONS ---- // 
+
+
 
 /// =================================== !! Variable's START !! ================================================ ///
 #pragma region
@@ -1111,9 +1220,8 @@ public:
 			}
 			Builder.CreateRetVoid();
 		}
-
-
-		return GetConstant(BOOL_TYPE);
+			
+		return GetConstant(BOOL_TYPE, 1.0f, false);
 	};
 
 	/**
@@ -1188,7 +1296,6 @@ public:
 		for (auto &stmt : StmtList)
 		{	
 			stmtListIdx++;
-			std::cout << "here " << std::endl;
 
 			// JUST NEED TO GET THIS FIXED 
 			// CAN BE FIXED SPLITTING UP FILES 
@@ -1203,6 +1310,8 @@ public:
 			 * 
 			 * Generate the statement and stop generating any more IR- as this code would never be reached
 			 */
+
+			
 			auto returnStmt = dynamic_cast<ReturnAST*>(stmt.get());
 			if (returnStmt != nullptr){
 
@@ -1217,14 +1326,14 @@ public:
 				}
 
 				// Just returning any non-null value if we're at a return stmt 
-				return ConstantInt::get(TheContext, APInt(1, 0, false));
+				return GetConstant(BOOL_TYPE, 1, false);
 			}
 			else 
 			{
 				containsReturn = stmt->codegen();
 			}
-
 		}
+
 
 		if (addScope){
 			ScopedNamedValues.pop_back();
@@ -1492,14 +1601,6 @@ public:
 			throw SemanticException("Invalid Binary Operator", Op.lineNo, Op.columnNo);
 		}
 
-		// Three blocks LHS,RHS, Continue block
-		// Create a temporary variable
-		// Jump to the LHS and evaluate the expression
-		// OR:
-		// If LHS is false, set the alloca to false and jump to the RHS (set the alloca to the result of the RHS and then jump to continue)
-		// If the LHS is true, set the alloca to true and jump to the continue block
-		// so above two with conditional jump
-
 		/**
 		 * If we are creating an expression for && or || we can try to apply lazy evaluation 
 		 * 
@@ -1508,81 +1609,17 @@ public:
 		 * 
 		 * We just need to store the value in the temporary alloca 
 		 *
+		 *
+		 * If we have (True || ...) -> We don't have to evaluate RHS. So we can branch to the continue block
+		 * If we have (False && ...) -> We don't have to evalaute RHS. So we can branch to the continue block÷
 		 */
-		if (Op.type == OR || Op.type == AND)
-		{
-			Function *TheFunction = Builder.GetInsertBlock()->getParent();
-
-			AllocaInst *tmpAlloca = CreateEntryBlockAlloca(TheFunction, "tmpLazy", TypeToLLVM(BOOL_TYPE, Op));
-
-			BasicBlock *RightBB = BasicBlock::Create(TheContext, "RExpr", TheFunction);
-			BasicBlock *SkipRightBB = BasicBlock::Create(TheContext, "SkipRExpr");
-			BasicBlock *ContBB = BasicBlock::Create(TheContext, "Cont");
-
-
-			llvm::Value *BoolRHS;
-			llvm::Value *BoolLHS = ImplicitCasting(LHS->codegen(), TypeToLLVM(BOOL_TYPE, Op), Op);
-
-			/**
-			 * If we have (True || ...) -> We don't have to evaluate RHS. So we can branch to the continue block
-			 * If we have (False && ...) -> We don't have to evalaute RHS. So we can branch to the continue block÷
-			 */
-			if (Op.type == OR)
-			{
-				Builder.CreateCondBr(BoolLHS, SkipRightBB, RightBB);
-
-				// Eval RHS- Set tmp to RHS Value 
-				TheFunction->getBasicBlockList().push_back(RightBB);
-				Builder.SetInsertPoint(RightBB);
-
-				BoolRHS = ImplicitCasting(RHS->codegen(), TypeToLLVM(BOOL_TYPE, Op), Op);
-				Builder.CreateStore(BoolRHS, tmpAlloca);
-
-				Builder.CreateBr(ContBB);
-
-				// Skip Eval RHS- Set tmp to True 
-				TheFunction->getBasicBlockList().push_back(SkipRightBB);
-				Builder.SetInsertPoint(SkipRightBB);
-
-				Builder.CreateStore(ConstantInt::get(TheContext, APInt(1, 1, false)), tmpAlloca);
-	
-				Builder.CreateBr(ContBB);
-
-				TheFunction->getBasicBlockList().push_back(ContBB);
-				Builder.SetInsertPoint(ContBB);
-
-				return Builder.CreateLoad(TypeToLLVM(BOOL_TYPE, Op), tmpAlloca, "exprBool");
-			}
-			else if (Op.type == AND)
-			{
-				Builder.CreateCondBr(BoolLHS, RightBB, SkipRightBB);
-
-				// Eval RHS- Set tmp to RHS Value 
-				TheFunction->getBasicBlockList().push_back(RightBB);
-				Builder.SetInsertPoint(RightBB);
-
-				BoolRHS = ImplicitCasting(RHS->codegen(), TypeToLLVM(BOOL_TYPE, Op), Op);
-				Builder.CreateStore(BoolRHS, tmpAlloca);
-
-				Builder.CreateBr(ContBB);
-
-				// Skip Eval RHS- Set tmp to False 
-				TheFunction->getBasicBlockList().push_back(SkipRightBB);
-				Builder.SetInsertPoint(SkipRightBB);
-
-				Builder.CreateStore(ConstantInt::get(TheContext, APInt(1, 0, false)), tmpAlloca);
-
-				Builder.CreateBr(ContBB);
-
-				TheFunction->getBasicBlockList().push_back(ContBB);
-				Builder.SetInsertPoint(ContBB);
-
-				return Builder.CreateLoad(TypeToLLVM(BOOL_TYPE, Op), tmpAlloca, "exprBool");
-			}
-		}
 
 		switch (Op.type)
 		{
+		case OR:
+			return CheckLazyOr(Op, std::move(LHS), std::move(RHS));
+		case AND:
+			return CheckLazyAnd(Op, std::move(LHS), std::move(RHS));
 		case PLUS:
 			if (HighestPrecisionType->isFloatTy())
 			{
@@ -1936,7 +1973,9 @@ public:
 	};
 
 	/**
-	 * @brief Generate prototype if function doesn't already exist, and add a new-level of scope.
+	 * @brief Generate prototype if function doesn't already exist, and add a new-level of scope
+	 * 
+	 * Also perform checks to see if all code paths in a function contain a return in a non-void function.
 	 *
 	 * @return llvm::Function* The function prototype and body generated
 	 */
@@ -1945,6 +1984,7 @@ public:
 		llvm::FunctionType *FT;
 		llvm::Function *FuncDef;
 		std::vector<llvm::Type *> Args;
+		
 		bool FuncContainsReturn = false; 
 		IfStmtLast = false;
 
@@ -2041,15 +2081,15 @@ public:
 			}
 			else if (FuncReturnType->isFloatTy())
 			{
-				Builder.CreateRet(ConstantFP::get(TheContext, APFloat(0.0f)));
+				Builder.CreateRet(GetConstant(FLOAT_TYPE, 0.0f));
 			}
 			else if (FuncReturnType->isIntegerTy(1))
 			{
-				Builder.CreateRet(ConstantInt::get(TheContext, APInt(1, 0, false)));
+				Builder.CreateRet(GetConstant(BOOL_TYPE, 0.0f, false));
 			}
 			else if (FuncReturnType->isIntegerTy(32))
 			{
-				Builder.CreateRet(ConstantInt::get(TheContext, APInt(32, 0, true)));
+				Builder.CreateRet(GetConstant(INT_TYPE, 0.0f, true));
 			}
 		}
 
@@ -2180,7 +2220,7 @@ public:
 	 */
 	llvm::Value *codegen() override
 	{
-		return ConstantInt::get(TheContext, APInt(32, std::stoi(Val.lexeme), true));
+		return GetConstant(INT_TYPE, std::stof(Val.lexeme), true);
 	};
 };
 class FloatAST : public ExprAST
@@ -2206,8 +2246,8 @@ public:
 	 * @return llvm::Value*
 	 */
 	llvm::Value *codegen() override
-	{
-		return ConstantFP::get(TheContext, APFloat(std::stof(Val.lexeme)));
+	{	
+		return GetConstant(FLOAT_TYPE, std::stof(Val.lexeme));
 	};
 };
 
@@ -2235,9 +2275,9 @@ public:
 	 */
 	llvm::Value *codegen() override
 	{
-		int boolVal = (Val.lexeme == "false" ? 0 : 1);
-
-		return ConstantInt::get(TheContext, APInt(1, boolVal, false));
+		float boolVal = (Val.lexeme == "false" ? 0.0f : 1.0f);
+		
+		return GetConstant(BOOL_TYPE, boolVal, false);
 	};
 };
 #pragma endregion
@@ -3705,6 +3745,14 @@ static std::unique_ptr<ProgramAST> Program()
 
 #pragma endregion
 
+
+// Global variables to be turned on and off at the markers will
+static bool PRINT_AST = false;
+static bool TERMINAL_IR = false;
+static bool WARNINGS = true; 
+
+
+
 static std::unique_ptr<ProgramAST> root;
 
 /**
@@ -3726,8 +3774,11 @@ static void parser()
 			throw ParseException("Invalid Token Error: \nExpected: end_of_file. ");
 		}
 
-		// AST Printer
-		root->to_string("", "Program", false);
+		if (PRINT_AST)
+		{
+			// AST Printer
+			root->to_string("", "Program", false);
+		}
 	}
 	catch (const std::exception &e)
 	{
@@ -3803,18 +3854,26 @@ int main(int argc, char **argv)
 		errs() << "Could not open file: " << EC.message();
 		return 1;
 	}
-	TheModule->print(errs(), nullptr); // print IR to terminal#
 
-	/**
-	 * Output any compiler warnings that didn't result in a crash, but may result in undesierable behaivour.
-	 */
-	if (Warnings.size() != 0)
+
+	if (TERMINAL_IR)
 	{
-		std::cout << "Warnings: " << std::endl;
-		int warningCnt = 0;
-		for (auto &Warn : Warnings)
+		TheModule->print(errs(), nullptr); // print IR to terminal#
+	}
+
+	if (WARNINGS)
+	{
+		/**
+		 * Output any compiler warnings that didn't result in a crash, but may result in undesierable behaivour.
+		 */
+		if (Warnings.size() != 0)
 		{
-			std::cout << std::to_string(++warningCnt) << ". " << Warn.to_string() << std::endl;
+			std::cout << "Warnings: " << std::endl;
+			int warningCnt = 0;
+			for (auto &Warn : Warnings)
+			{
+				std::cout << std::to_string(++warningCnt) << ". " << Warn.to_string() << std::endl;
+			}
 		}
 	}
 

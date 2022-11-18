@@ -33,7 +33,7 @@ SkipRExpr:                                        ; preds = %entry
 
 Cont:                                             ; preds = %SkipRExpr, %RExpr3
   %exprBool = load i1, ptr %tmpLazy, align 1
-  %ifcond = select i1 %exprBool, i1 true, i1 false
+  %ifcond = or i1 %exprBool, false
   br i1 %ifcond, label %then, label %else
 
 then:                                             ; preds = %Cont
@@ -72,7 +72,7 @@ SkipRExpr:                                        ; preds = %entry
 
 Cont:                                             ; preds = %SkipRExpr, %RExpr3
   %exprBool = load i1, ptr %tmpLazy, align 1
-  %ifcond = select i1 %exprBool, i1 true, i1 false
+  %ifcond = or i1 %exprBool, false
   br i1 %ifcond, label %then, label %else
 
 then:                                             ; preds = %Cont

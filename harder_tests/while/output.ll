@@ -14,13 +14,13 @@ entry:
 loopcond:                                         ; preds = %ifcont, %entry
   %x2 = load i32, ptr %x1, align 4
   %ilttmp = icmp slt i32 %x2, 10
-  %whilecond = select i1 %ilttmp, i1 true, i1 false
+  %whilecond = or i1 %ilttmp, false
   br i1 %whilecond, label %while, label %whilecont
 
 while:                                            ; preds = %loopcond
   %x3 = load i32, ptr %x1, align 4
   %ilttmp4 = icmp slt i32 %x3, 5
-  %ifcond = select i1 %ilttmp4, i1 true, i1 false
+  %ifcond = or i1 %ilttmp4, false
   br i1 %ifcond, label %then, label %else
 
 then:                                             ; preds = %while

@@ -17,7 +17,7 @@ loopcond:                                         ; preds = %while, %entry
   %i2 = load i32, ptr %i, align 4
   %n3 = load i32, ptr %n1, align 4
   %ilteqtmp = icmp sle i32 %i2, %n3
-  %whilecond = select i1 %ilteqtmp, i1 true, i1 false
+  %whilecond = or i1 %ilteqtmp, false
   br i1 %whilecond, label %while, label %whilecont
 
 while:                                            ; preds = %loopcond

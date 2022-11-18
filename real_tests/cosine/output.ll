@@ -28,7 +28,7 @@ loopcond:                                         ; preds = %while, %entry
   %term2 = load float, ptr %term, align 4
   %eps3 = load float, ptr %eps, align 4
   %fgttmp = fcmp ogt float %term2, %eps3
-  %whilecond = select i1 %fgttmp, i1 true, i1 false
+  %whilecond = or i1 %fgttmp, false
   br i1 %whilecond, label %while, label %whilecont
 
 while:                                            ; preds = %loopcond

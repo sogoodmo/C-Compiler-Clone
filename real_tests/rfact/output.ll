@@ -10,7 +10,7 @@ entry:
   store i32 0, ptr %result, align 4
   %n2 = load i32, ptr %n1, align 4
   %igteqtmp = icmp sge i32 %n2, 1
-  %ifcond = select i1 %igteqtmp, i1 true, i1 false
+  %ifcond = or i1 %igteqtmp, false
   br i1 %ifcond, label %then, label %else
 
 then:                                             ; preds = %entry
