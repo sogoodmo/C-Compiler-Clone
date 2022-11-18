@@ -1494,12 +1494,6 @@ public:
 		// If the LHS is true, set the alloca to true and jump to the continue block
 		// so above two with conditional jump
 
-
-		// AND:
-		// If the LHS is true, set the alloca to false and jump to the RHS
-		// u can figure rest out 
-
-
 		/**
 		 * If we are creating an expression for && or || we can try to apply lazy evaluation 
 		 * 
@@ -1515,12 +1509,10 @@ public:
 
 			AllocaInst *tmpAlloca = CreateEntryBlockAlloca(TheFunction, "tmpLazy", TypeToLLVM(BOOL_TYPE, Op));
 
-			BasicBlock *LeftBB = BasicBlock::Create(TheContext, "LExpr", TheFunction);
-			BasicBlock *RightBB = BasicBlock::Create(TheContext, "RExpr");
-			BasicBlock *ContBB = BasicBlock::Create(TheContext, "ExprCont");
+			BasicBlock *RightBB = BasicBlock::Create(TheContext, "RExpr", TheFunction);
+			BasicBlock *SkipRightBB = BasicBlock::Create(TheContext, "SkipRExpr");
+			BasicBlock *ContBB = BasicBlock::Create(TheContext, "Cont");
 
-			Builder.CreateBr(LeftBB);
-			Builder.SetInsertPoint(LeftBB);
 
 			llvm::Value *BoolRHS;
 			llvm::Value *BoolLHS = ImplicitCasting(LHS->codegen(), TypeToLLVM(BOOL_TYPE, Op), Op);
@@ -1531,7 +1523,7 @@ public:
 			 */
 			if (Op.type == OR)
 			{
-				Builder.CreateCondBr(BoolLHS, ContBB, RightBB);
+				Builder.CreateCondBr(BoolLHS, SkipRightBB, RightBB);
 
 				// Eval RHS- Set tmp to RHS Value 
 				TheFunction->getBasicBlockList().push_back(RightBB);
@@ -1540,17 +1532,24 @@ public:
 				BoolRHS = ImplicitCasting(RHS->codegen(), TypeToLLVM(BOOL_TYPE, Op), Op);
 				Builder.CreateStore(BoolRHS, tmpAlloca);
 
+				Builder.CreateBr(ContBB);
+
 				// Skip Eval RHS- Set tmp to True 
-				TheFunction->getBasicBlockList().push_back(ContBB);
-				Builder.SetInsertPoint(ContBB);
+				TheFunction->getBasicBlockList().push_back(SkipRightBB);
+				Builder.SetInsertPoint(SkipRightBB);
 
 				Builder.CreateStore(ConstantInt::get(TheContext, APInt(1, 1, false)), tmpAlloca);
 	
+				Builder.CreateBr(ContBB);
+
+				TheFunction->getBasicBlockList().push_back(ContBB);
+				Builder.SetInsertPoint(ContBB);
+
 				return Builder.CreateLoad(TypeToLLVM(BOOL_TYPE, Op), tmpAlloca, "exprBool");
 			}
 			else if (Op.type == AND)
 			{
-				Builder.CreateCondBr(BoolLHS, RightBB, ContBB);
+				Builder.CreateCondBr(BoolLHS, RightBB, SkipRightBB);
 
 				// Eval RHS- Set tmp to RHS Value 
 				TheFunction->getBasicBlockList().push_back(RightBB);
@@ -1559,11 +1558,18 @@ public:
 				BoolRHS = ImplicitCasting(RHS->codegen(), TypeToLLVM(BOOL_TYPE, Op), Op);
 				Builder.CreateStore(BoolRHS, tmpAlloca);
 
+				Builder.CreateBr(ContBB);
+
 				// Skip Eval RHS- Set tmp to False 
-				TheFunction->getBasicBlockList().push_back(ContBB);
-				Builder.SetInsertPoint(ContBB);
+				TheFunction->getBasicBlockList().push_back(SkipRightBB);
+				Builder.SetInsertPoint(SkipRightBB);
 
 				Builder.CreateStore(ConstantInt::get(TheContext, APInt(1, 0, false)), tmpAlloca);
+
+				Builder.CreateBr(ContBB);
+
+				TheFunction->getBasicBlockList().push_back(ContBB);
+				Builder.SetInsertPoint(ContBB);
 
 				return Builder.CreateLoad(TypeToLLVM(BOOL_TYPE, Op), tmpAlloca, "exprBool");
 			}
@@ -2001,9 +2007,16 @@ public:
 
 		// If the function isn't void
 		// and not all paths return a value this must throw an exception
-		if (!AllPathsReturn && !FuncReturnType->isVoidTy())
+		if (!AllPathsReturn)
 		{
-			throw SemanticException("Not all code paths return value in non-void function.", Ident.lineNo, Ident.columnNo);
+			if (FuncReturnType->isVoidTy())
+			{
+				Builder.CreateRetVoid();
+			}
+			else
+			{
+				throw SemanticException("Not all code paths return value in non-void function.", Ident.lineNo, Ident.columnNo);
+			}
 		}
 		
 		/**

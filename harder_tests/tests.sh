@@ -101,12 +101,12 @@ validate "./returns"
 # $CLANG driver.cpp output.ll  -o assign
 # validate "./assign"
 
-# Doesn't work 
-cd ../lazyeval/
-pwd
-rm -rf output.ll lazyeval
-"$COMP" ./lazyeval.c
-$CLANG driver.cpp output.ll -o lazyeval
-validate "./lazyeval"
+# Works 
+# cd harder_tests/lazyeval/
+# pwd
+# rm -rf output.ll lazyeval
+# "$COMP" ./lazyeval.c
+# $CLANG driver.cpp output.ll -o lazyeval
+# validate "./lazyeval"
 
 echo "***** ALL (HARDER) TESTS PASSED *****"

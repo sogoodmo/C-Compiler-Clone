@@ -17,32 +17,33 @@ entry:
   %control1 = alloca i32, align 4
   store i32 %control, ptr %control1, align 4
   store i32 0, ptr @mutable_var, align 4
-  br label %LExpr
-
-LExpr:                                            ; preds = %entry
   %control2 = load i32, ptr %control1, align 4
   %ieqtmp = icmp eq i32 %control2, 1
-  br i1 %ieqtmp, label %RExpr, label %ExprCont
+  br i1 %ieqtmp, label %RExpr3, label %SkipRExpr
 
-RExpr:                                            ; preds = %LExpr
+RExpr3:                                           ; preds = %entry
   %calltmp = call i32 @mutating_function()
   %"&&" = icmp ne i32 %calltmp, 0
   store i1 %"&&", ptr %tmpLazy, align 1
+  br label %Cont
 
-ExprCont:                                         ; preds = %LExpr
+SkipRExpr:                                        ; preds = %entry
   store i1 false, ptr %tmpLazy, align 1
+  br label %Cont
+
+Cont:                                             ; preds = %SkipRExpr, %RExpr3
   %exprBool = load i1, ptr %tmpLazy, align 1
   %ifcond = select i1 %exprBool, i1 true, i1 false
   br i1 %ifcond, label %then, label %else
 
-then:                                             ; preds = %ExprCont
+then:                                             ; preds = %Cont
   %mutable_var = load i32, ptr @mutable_var, align 4
   ret i32 %mutable_var
   br label %ifcont
 
-else:                                             ; preds = %ExprCont
-  %mutable_var3 = load i32, ptr @mutable_var, align 4
-  ret i32 %mutable_var3
+else:                                             ; preds = %Cont
+  %mutable_var4 = load i32, ptr @mutable_var, align 4
+  ret i32 %mutable_var4
   br label %ifcont
 
 ifcont:                                           ; preds = %else, %then
@@ -55,32 +56,33 @@ entry:
   %control1 = alloca i32, align 4
   store i32 %control, ptr %control1, align 4
   store i32 0, ptr @mutable_var, align 4
-  br label %LExpr
-
-LExpr:                                            ; preds = %entry
   %control2 = load i32, ptr %control1, align 4
   %ieqtmp = icmp eq i32 %control2, 1
-  br i1 %ieqtmp, label %ExprCont, label %RExpr
+  br i1 %ieqtmp, label %SkipRExpr, label %RExpr3
 
-RExpr:                                            ; preds = %LExpr
+RExpr3:                                           ; preds = %entry
   %calltmp = call i32 @mutating_function()
   %"||" = icmp ne i32 %calltmp, 0
   store i1 %"||", ptr %tmpLazy, align 1
+  br label %Cont
 
-ExprCont:                                         ; preds = %LExpr
+SkipRExpr:                                        ; preds = %entry
   store i1 true, ptr %tmpLazy, align 1
+  br label %Cont
+
+Cont:                                             ; preds = %SkipRExpr, %RExpr3
   %exprBool = load i1, ptr %tmpLazy, align 1
   %ifcond = select i1 %exprBool, i1 true, i1 false
   br i1 %ifcond, label %then, label %else
 
-then:                                             ; preds = %ExprCont
+then:                                             ; preds = %Cont
   %mutable_var = load i32, ptr @mutable_var, align 4
   ret i32 %mutable_var
   br label %ifcont
 
-else:                                             ; preds = %ExprCont
-  %mutable_var3 = load i32, ptr @mutable_var, align 4
-  ret i32 %mutable_var3
+else:                                             ; preds = %Cont
+  %mutable_var4 = load i32, ptr @mutable_var, align 4
+  ret i32 %mutable_var4
   br label %ifcont
 
 ifcont:                                           ; preds = %else, %then
