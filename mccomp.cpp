@@ -817,7 +817,6 @@ static llvm::Value *ImplicitCasting(llvm::Value *val, llvm::Type *newType, TOKEN
 
 
 
-
 // ---- AST Declerations ---- //
 #pragma region
 class ProgramAST;
@@ -1297,14 +1296,6 @@ public:
 		{	
 			stmtListIdx++;
 
-			// JUST NEED TO GET THIS FIXED 
-			// CAN BE FIXED SPLITTING UP FILES 
-			// 
-			// Used to keep track if an ifstmt was the last stmt in the block 
-			// In case the IF is guranteed to return a value & there are lines of code proceeding it (In which case a warning should be thrown)			
-			// IfStmtLast = dynamic_cast<IfAST*>(stmt.get()) != nullptr;
-
-
 			/**
 			 * If the current statement is a return statement, throw a warning only if it's not the last statement in a block
 			 * 
@@ -1414,6 +1405,7 @@ public:
 		trueBlockReturn = TrueBlock->codegen() != nullptr;
 
 		Builder.CreateBr(MergeBB);
+
 		TrueBB = Builder.GetInsertBlock();
 
 		ScopedNamedValues.pop_back();
@@ -2076,7 +2068,7 @@ public:
 		 */
 		if (IfPathsReturn && !FuncContainsReturn){
 			if (!IfStmtLast){
-				Warnings.push_back(Warning("\033[0;33mWarning:\033[0m Any code after if-statement will not be executed in Function: "+Ident.lexeme, Ident.lineNo, Ident.columnNo));
+				Warnings.push_back(Warning("\033[0;33mWarning:\033[0m Any code after if-statement may not be reachable in Function: "+Ident.lexeme, Ident.lineNo, Ident.columnNo));
 			}
 			
 			if (FuncReturnType->isVoidTy())
@@ -3751,7 +3743,7 @@ static std::unique_ptr<ProgramAST> Program()
 
 
 // Global variables to be turned on and off at the markers will
-static bool PRINT_AST = false;
+static bool PRINT_AST = true;
 static bool TERMINAL_IR = false;
 static bool WARNINGS = true; 
 
