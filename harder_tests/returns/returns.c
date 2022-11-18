@@ -1,6 +1,7 @@
 // Test written by Joey
 
 int returns(int x) {
+
     while (x == 1) {
         return 0;
         x = x + 1;

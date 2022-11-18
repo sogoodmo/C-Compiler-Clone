@@ -1447,6 +1447,10 @@ public:
 		{
 			IfPathsReturn = true; 
 		}
+		else 
+		{
+			IfPathsReturn = false; 
+		}
 
 		return nullptr;
 	};
