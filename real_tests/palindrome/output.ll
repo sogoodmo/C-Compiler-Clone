@@ -21,8 +21,8 @@ entry:
 
 loopcond:                                         ; preds = %while, %entry
   %number3 = load i32, ptr %number1, align 4
-  %igttmp = icmp ugt i32 %number3, 0
-  %whilecond = select i1 %igttmp, i1 true, i1 false
+  %Igttmp = icmp sgt i32 %number3, 0
+  %whilecond = select i1 %Igttmp, i1 true, i1 false
   br i1 %whilecond, label %while, label %whilecont
 
 while:                                            ; preds = %loopcond

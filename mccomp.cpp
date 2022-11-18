@@ -54,6 +54,7 @@ static std::unique_ptr<Module> TheModule;
 static std::vector<std::unordered_map<std::string, llvm::AllocaInst *>> ScopedNamedValues;
 static std::unordered_map<std::string, llvm::GlobalVariable *> GlobalVariables;
 static std::unordered_set<std::string> UndefinedVars;
+
 static bool IfPathsReturn = false; 
 static bool IfStmtLast = false; 
 
@@ -1097,7 +1098,7 @@ public:
 			
 			if (RetValue->getType() != FuncReturnType)
 			{
-				throw SemanticException("Incorrect Function Return Type. Expected: " + llvmTypeToStr(RetValue->getType()) + " Got: " + llvmTypeToStr(FuncReturnType), returnTok.lineNo, returnTok.columnNo);
+				throw SemanticException("Incorrect Function Return Type. Expected: " + llvmTypeToStr(FuncReturnType) + " Got: " + llvmTypeToStr(RetValue->getType()), returnTok.lineNo, returnTok.columnNo);
 			}
 
 			Builder.CreateRet(RetValue);
@@ -1110,7 +1111,9 @@ public:
 			}
 			Builder.CreateRetVoid();
 		}
-		return nullptr;
+
+
+		return GetConstant(BOOL_TYPE);
 	};
 
 	/**
@@ -1162,6 +1165,7 @@ public:
 	llvm::Value *codegen() override
 	{
 		bool addScope = !isFuncBlock;
+		llvm::Value *containsReturn;
 
 		// If this block is called from a function defintion
 		// We must NOT add a layer of scope (As it has already been add for arguments)
@@ -1184,7 +1188,7 @@ public:
 		for (auto &stmt : StmtList)
 		{	
 			stmtListIdx++;
-
+			std::cout << "here " << std::endl;
 
 			// JUST NEED TO GET THIS FIXED 
 			// CAN BE FIXED SPLITTING UP FILES 
@@ -1207,16 +1211,17 @@ public:
 				}
 
 				stmt->codegen();
+
 				if (addScope){
 					ScopedNamedValues.pop_back();
 				}
 
-				// Just returning any non-null value 
+				// Just returning any non-null value if we're at a return stmt 
 				return ConstantInt::get(TheContext, APInt(1, 0, false));
 			}
-			else
+			else 
 			{
-				stmt->codegen();
+				containsReturn = stmt->codegen();
 			}
 
 		}
@@ -1224,7 +1229,8 @@ public:
 		if (addScope){
 			ScopedNamedValues.pop_back();
 		}
-		return nullptr;
+
+		return containsReturn;
 	};
 };
 
@@ -1330,7 +1336,7 @@ public:
 		// Keep track of this 
 		if (trueBlockReturn && ElseBlock != nullptr && elseBlockReturn)
 		{
-			IfPathsReturn = IfPathsReturn || true; 
+			IfPathsReturn = true; 
 		}
 
 		return nullptr;
@@ -1935,11 +1941,12 @@ public:
 	 * @return llvm::Function* The function prototype and body generated
 	 */
 	llvm::Function *codegen() override
-	{
+	{	
 		llvm::FunctionType *FT;
 		llvm::Function *FuncDef;
 		std::vector<llvm::Type *> Args;
 		bool FuncContainsReturn = false; 
+		IfStmtLast = false;
 
 		Function *ExternFuncDef = TheModule->getFunction(Ident.lexeme);
 		
@@ -2002,6 +2009,7 @@ public:
 		isFuncBlock = true; 
 
 		FuncContainsReturn = FuncBlock->codegen() != nullptr;
+		
 		bool AllPathsReturn = IfPathsReturn || FuncContainsReturn;
 		llvm::Type *FuncReturnType = Builder.getCurrentFunctionReturnType();
 

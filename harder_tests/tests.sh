@@ -38,75 +38,75 @@ function validate {
 echo "Test *****"
 
 # Works 
-# cd harder_tests/implicit/
-# pwd
-# rm -rf output.ll imp
-# "$COMP" ./implicit.c
-# $CLANG driver.cpp output.ll  -o imp
-# validate "./imp"
+cd harder_tests/implicit/
+pwd
+rm -rf output.ll imp
+"$COMP" ./implicit.c
+$CLANG driver.cpp output.ll  -o imp
+validate "./imp"
+
+# Works 
+cd ../scope/
+pwd
+rm -rf output.ll scope
+"$COMP" ./scope.c
+$CLANG driver.cpp output.ll  -o scope
+validate "./scope"
+
+# Works
+cd ../associativity/
+pwd
+rm -rf output.ll assoc
+"$COMP" ./associativity.c
+$CLANG driver.cpp output.ll  -o assoc
+validate "./assoc"
+
+# Works
+cd ../global/
+pwd
+rm -rf output.ll global
+"$COMP" ./global.c
+$CLANG driver.cpp output.ll  -o global
+validate "./global"
 
 # # Works 
-# cd ../scope/
-# pwd
-# rm -rf output.ll scope
-# "$COMP" ./scope.c
-# $CLANG driver.cpp output.ll  -o scope
-# validate "./scope"
-
-# # Works
-# cd ../associativity/
-# pwd
-# rm -rf output.ll assoc
-# "$COMP" ./associativity.c
-# $CLANG driver.cpp output.ll  -o assoc
-# validate "./assoc"
-
-# # Works
-# cd ../global/
-# pwd
-# rm -rf output.ll global
-# "$COMP" ./global.c
-# $CLANG driver.cpp output.ll  -o global
-# validate "./global"
-
-# # Works 
-cd harder_tests/returns/
+cd ../returns/
 pwd
 rm -rf output.ll returns
 "$COMP" ./returns.c
 $CLANG driver.cpp output.ll  -o returns
 validate "./returns"
 
-# # Doesn't work
-# cd ../unary2/
-# pwd
-# rm -rf output.ll unary2
-# "$COMP" ./unary2.c
-# $CLANG driver.cpp output.ll  -o unary2
-# validate "./unary2"
+# Doesn't work
+cd ../unary2/
+pwd
+rm -rf output.ll unary2
+"$COMP" ./unary2.c
+$CLANG driver.cpp output.ll  -o unary2
+validate "./unary2"
 
 # Works 
-# cd ../while/
-# pwd
-# rm -rf output.ll while
-# "$COMP" ./while.c
-# $CLANG driver.cpp output.ll  -o while
-# validate "./while"
+cd ../while/
+pwd
+rm -rf output.ll while
+"$COMP" ./while.c
+$CLANG driver.cpp output.ll  -o while
+validate "./while"
 
-# # Works
-# cd ../assign/
-# pwd
-# rm -rf output.ll assign
-# "$COMP" ./assign.c
-# $CLANG driver.cpp output.ll  -o assign
-# validate "./assign"
+# Works
+cd ../assign/
+pwd
+rm -rf output.ll assign
+"$COMP" ./assign.c
+$CLANG driver.cpp output.ll  -o assign
+validate "./assign"
 
 # Works 
-# cd harder_tests/lazyeval/
-# pwd
-# rm -rf output.ll lazyeval
-# "$COMP" ./lazyeval.c
-# $CLANG driver.cpp output.ll -o lazyeval
-# validate "./lazyeval"
+cd ../lazyeval/
+pwd
+rm -rf output.ll lazyeval
+"$COMP" ./lazyeval.c
+$CLANG driver.cpp output.ll -o lazyeval
+validate "./lazyeval"
 
 echo "***** ALL (HARDER) TESTS PASSED *****"
