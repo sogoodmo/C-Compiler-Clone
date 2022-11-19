@@ -1,0 +1,3348 @@
+#include "Compiler/lexer.cpp"
+#include "Compiler/parser.cpp"
+#include "Compiler/ast.cpp"
+
+
+
+
+//===----------------------------------------------------------------------===//
+
+/// ASTnode - Base class for all AST nodes.
+class ASTnode
+{
+public:
+	virtual ~ASTnode() {}
+	virtual llvm::Value *codegen() = 0;
+	virtual void to_string(const std::string &prefix, const std::string &nodeStr, bool isLeft) const {};
+};
+
+enum VAR_TYPE
+{
+	VOID_TYPE = 0,
+	INT_TYPE,
+	FLOAT_TYPE,
+	BOOL_TYPE
+};
+
+/**
+ * @brief Converts type enum to string
+ *
+ * @param type The type to convert
+ * @return const std::string The string of the converted type
+ */
+const std::string TypeToStr(VAR_TYPE type)
+{
+	switch (type)
+	{
+	case VOID_TYPE:
+		return "void";
+	case INT_TYPE:
+		return "int";
+	case FLOAT_TYPE:
+		return "float";
+	case BOOL_TYPE:
+		return "bool";
+	default:
+		return "";
+	}
+}
+
+/**
+ * @brief Get the constant llvm value from a type and value 
+ * 
+ * @param type The type of the constant
+ * @param Val The value of the constant 
+ * @param signed If the constant is signed or not 
+ * @return llvm::Value* 
+ */
+llvm::Value *GetConstant(VAR_TYPE type, float Val, bool isSigned=false)
+{
+	// Since float is highest precision type
+	// Downcasting won't lose any information.
+	if (type != FLOAT_TYPE)
+	{
+		Val = (int)Val;
+	}
+
+	switch (type)
+	{
+		case INT_TYPE:
+			return ConstantInt::get(TheContext, APInt(32, Val, isSigned));
+		case FLOAT_TYPE:
+			return ConstantFP::get(TheContext, APFloat(Val));
+		case BOOL_TYPE:
+			return ConstantInt::get(TheContext, APInt(1, Val, isSigned));
+		default:
+			throw SemanticException("",-1,-1);
+	}
+}
+
+/**
+ * @brief Returns the matching llvm type for the type passed in.
+ *
+ * @param type The type of the variable
+ * @return const llvm::Type The LLVM Type of the variable passed
+ */
+llvm::Type *TypeToLLVM(VAR_TYPE type, TOKEN tokInfo)
+{
+
+	switch (type)
+	{
+	case VOID_TYPE:
+		return Type::getVoidTy(TheContext);
+	case INT_TYPE:
+		return IntegerType::getInt32Ty(TheContext);
+	case FLOAT_TYPE:
+		return Type::getFloatTy(TheContext);
+	case BOOL_TYPE:
+		return IntegerType::getInt1Ty(TheContext);
+	default:
+		throw SemanticException("Unexpected Type. \nExpected one of ['int', 'void', 'bool', 'float']", tokInfo.lineNo, tokInfo.columnNo);
+	}
+}
+
+/**
+ * @brief Get the Highest Precision Type object
+ *
+ * @param t1 First Type
+ * @param t2 Second Type
+ * @return llvm::Type* Returns the type with the higher precision of the 2
+ */
+llvm::Type *GetHighestPrecisionType(llvm::Type *t1, llvm::Type *t2)
+{
+	if (t1->isFloatTy() || t2->isFloatTy())
+	{
+		return Type::getFloatTy(TheContext);
+	}
+	else if (t1->isIntegerTy(32) || t2->isIntegerTy(32))
+	{
+		return IntegerType::getInt32Ty(TheContext);
+	}
+	else if (t2->isIntegerTy(1) || t2->isIntegerTy(1))
+	{
+		return IntegerType::getInt1Ty(TheContext);
+	}
+
+	throw SemanticException("Unexpected Type.", -1, -1);
+}
+
+/**
+ * @brief Converts the LLVM Type into human readable string. 
+ * 
+ * @param type 
+ * @return const std::string 
+ */
+const std::string llvmTypeToStr(llvm::Type *type){
+	if (type->isFloatTy())
+	{
+		return "float";
+	} 
+	else if (type->isIntegerTy(1))
+	{
+		return "bool";
+	}
+	else if (type->isIntegerTy(32))
+	{
+		return "int";
+	}
+	else if (type->isVoidTy())
+	{
+		return "void";
+	}
+	return "";
+}
+
+// Create an alloca instruction in the entry block of the function.
+// This is used for mutable variables etc.
+static llvm::AllocaInst *CreateEntryBlockAlloca(Function *TheFunction, const std::string &VarName, llvm::Type *type)
+{
+	IRBuilder<> TmpB(&TheFunction->getEntryBlock(), TheFunction->getEntryBlock().begin());
+	return TmpB.CreateAlloca(type, 0, VarName.c_str());
+}
+
+/**
+ * @brief Convert the expression from it's original type to a boolean type
+ *
+ * @param val Value of the expressiom
+ * @param type Type of the value of the expression
+ * @return llvm::Value*
+ */
+static llvm::Value *GetBool(llvm::Value *val, llvm::Type *type, std::string loopStr)
+{
+	if (type->isFloatTy())
+	{
+		return Builder.CreateFCmpONE(val, GetConstant(FLOAT_TYPE, 0.0f), loopStr);
+	}
+	else if (type->isIntegerTy(32))
+	{
+		return Builder.CreateICmpNE(val, GetConstant(INT_TYPE, 0.0f, true), loopStr);
+	}
+	else if (type->isIntegerTy(1))
+	{
+		return Builder.CreateOr(val, GetConstant(BOOL_TYPE, 0.0f, false), loopStr);
+	}
+
+	throw SemanticException("", -1, -1);
+}
+
+/**
+ * @brief Add a warning to the buffer if a return has been written and there are lines following it in the same block.
+ * 
+ */
+void addReturnWarning(int line, int col){
+	Warnings.push_back(Warning("\033[0;33mWarning:\033[0m Return statement will cause it's following lines to not be executed", line, col));
+}
+
+/**
+ * @brief 
+ * Checks if the variable has already been defined- if it has a warning is thrown.
+ * 
+ * Then it returns the stored object
+ * 
+ * @tparam T GlobalAlloca or Normal Alloca
+ * @param alloca The alloca we want to load  
+ * @param llvmType The type of the variable 
+ * @param ident The name of the variable  
+ * @return llvm::Value* 
+ */
+template <typename T>
+llvm::Value *CheckDefinedAndLoad(T alloca, llvm::Type *llvmType, TOKEN Ident)
+{
+	if (UndefinedVars.count(Ident.lexeme) != 0)
+	{
+		UndefinedVars.erase(Ident.lexeme);
+		Warnings.push_back(Warning("\033[0;33mWarning:\033[0m Referencing undefined variable. Using default value", Ident.lineNo, Ident.columnNo));
+	}
+
+	return Builder.CreateLoad(llvmType, alloca, Ident.lexeme.c_str());
+}
+
+/**
+ * @brief Adds warning to warning buffer if attempting to implicitly convert and may lose precision
+ * Returns new value after conversion.
+ *
+ * @param val Value
+ * @param alloca Alloca to update
+ */
+static llvm::Value *ImplicitCasting(llvm::Value *val, llvm::Type *newType, TOKEN tokInfo, std::string optionalError="")
+{
+	llvm::Type *oldType = val->getType();
+
+	/**
+	 * If casting same types, no extra work needs to be done. Can just return given value
+	 */
+	if (oldType == newType)
+	{
+		return val;
+	}
+
+	// Float -> Int Conversion - Precision Loss
+	if (oldType->isFloatTy() && newType->isIntegerTy(32))
+	{
+		Warnings.push_back(Warning("\033[0;33mWarning:\033[0m Implict conversion from Float to Int32. May lose precision" + optionalError, tokInfo.lineNo, tokInfo.columnNo));
+		return Builder.CreateFPToSI(val, newType, tokInfo.lexeme.c_str());
+	}
+
+	// Float -> Bool Conversion - Precision Loss
+	if (oldType->isFloatTy() && newType->isIntegerTy(1))
+	{
+		Warnings.push_back(Warning("\033[0;33mWarning:\033[0m Implict conversion from Bool to Float. May lose precision" + optionalError, tokInfo.lineNo, tokInfo.columnNo));
+		return Builder.CreateFCmpONE(val, GetConstant(FLOAT_TYPE, 0.0f), tokInfo.lexeme.c_str());
+	}
+
+	// Int -> Bool Conversion - Precision Loss
+	if (oldType->isIntegerTy(32) && newType->isIntegerTy(1))
+	{
+		Warnings.push_back(Warning("\033[0;33mWarning:\033[0m Implict conversion from Int32 to Bool. May lose precision" + optionalError, tokInfo.lineNo, tokInfo.columnNo));
+		return Builder.CreateICmpNE(val, GetConstant(INT_TYPE, 0, true), tokInfo.lexeme.c_str());
+	}
+
+	// Int -> Float Conversion - No Precision Loss
+	if (oldType->isIntegerTy(32) && newType->isFloatTy())
+	{
+		// Warnings.push_back(Warning("Warning: Implict conversion from Int32 to Float. May result in unexpected behaivour" + optionalError, tokInfo.lineNo, tokInfo.columnNo));
+		return Builder.CreateSIToFP(val, newType, tokInfo.lexeme.c_str());
+	}
+
+	// Bool -> Float Conversion - No Precision Loss
+	if (oldType->isIntegerTy(1) && newType->isFloatTy())
+	{
+		// Warnings.push_back(Warning("Warning: Implict conversion from Bool to Float. May result in unexpected behaivour" + optionalError, tokInfo.lineNo, tokInfo.columnNo));
+		return Builder.CreateUIToFP(val, newType, tokInfo.lexeme.c_str());
+	}
+
+	// Bool -> Int Conversion - No Precision Loss
+	if (oldType->isIntegerTy(1) && newType->isIntegerTy(32))
+	{
+
+		// Warnings.push_back(Warning("Warning: Implict conversion from Bool to Int32. May result in unexpected behaivour" + optionalError, tokInfo.lineNo, tokInfo.columnNo));
+		return Builder.CreateIntCast(val, newType, false, tokInfo.lexeme.c_str());
+	}
+
+	throw SemanticException("Unexpected Type. Expected int, bool or float.", tokInfo.lineNo, tokInfo.columnNo);
+}
+
+
+
+// ---- AST Declerations ---- //
+#pragma region
+class ProgramAST;
+class DeclAST;
+
+class ParamAST;
+class FuncDeclAST;
+class FuncCallAST;
+
+class VariableAST;
+class VariableDeclAST;
+class VariableAssignmentAST;
+
+class StmtAST;
+class BlockAST;
+class IfAST;
+class WhileAST;
+class ReturnAST;
+
+class ExprAST;
+class BinaryExprAST;
+class UnaryExprAST;
+
+class IntegerAST;
+class FloatAST;
+class BoolAST;
+
+class StmtAST : public ASTnode
+{
+};
+class ExprAST : public StmtAST
+{
+};
+
+#pragma endregion
+// ---- AST Declerations ---- //
+
+// ---- LAZY EVAL FUNCTIONS ---- // 
+/**
+ * @brief Creates 3 branches when checking LazyOR. Right Branch, Skip Right Branch, Continue Branch
+ * 
+ * We also create a temp alloca
+ * 
+ * If the LHS Expression evaluates to TRUE -> We jump to the skip right branch which sets the value of 
+ * of this temp alloca to TRUE.
+ * 
+ * If the LHS Expression evalautes to FALSE -> We jump to the right branch and set the value of this alloca
+ * to the value of the RHS 
+ * 
+ * Then we return the value of this alloca 
+ * 
+ * @param Op Token info for error info 
+ * @param LHS LHS Of Bin Expression
+ * @param RHS RHS Of Bin Expression 
+ * @return llvm::Value* 
+ */
+llvm::Value* CheckLazyOr(TOKEN Op, std::unique_ptr<ExprAST> LHS, std::unique_ptr<ExprAST> RHS)
+{
+	Function *TheFunction = Builder.GetInsertBlock()->getParent();
+
+	AllocaInst *tmpAlloca = CreateEntryBlockAlloca(TheFunction, "tmpLazy", TypeToLLVM(BOOL_TYPE, Op));
+
+	BasicBlock *RightBB = BasicBlock::Create(TheContext, "RExpr", TheFunction);
+	BasicBlock *SkipRightBB = BasicBlock::Create(TheContext, "SkipRExpr");
+	BasicBlock *ContBB = BasicBlock::Create(TheContext, "Cont");
+
+
+	llvm::Value *BoolRHS;
+	llvm::Value *BoolLHS = ImplicitCasting(LHS->codegen(), TypeToLLVM(BOOL_TYPE, Op), Op);
+
+	Builder.CreateCondBr(BoolLHS, SkipRightBB, RightBB);
+
+	// Eval RHS- Set tmp to RHS Value 
+	TheFunction->getBasicBlockList().push_back(RightBB);
+	Builder.SetInsertPoint(RightBB);
+
+	BoolRHS = ImplicitCasting(RHS->codegen(), TypeToLLVM(BOOL_TYPE, Op), Op);
+	Builder.CreateStore(BoolRHS, tmpAlloca);
+
+	Builder.CreateBr(ContBB);
+
+	// Skip Eval RHS- Set tmp to True 
+	TheFunction->getBasicBlockList().push_back(SkipRightBB);
+	Builder.SetInsertPoint(SkipRightBB);
+
+	Builder.CreateStore(GetConstant(BOOL_TYPE, 1.0f, false), tmpAlloca);
+
+	Builder.CreateBr(ContBB);
+
+	TheFunction->getBasicBlockList().push_back(ContBB);
+	Builder.SetInsertPoint(ContBB);
+
+	return Builder.CreateLoad(TypeToLLVM(BOOL_TYPE, Op), tmpAlloca, "exprBool");
+}
+
+/**
+ * @brief Creates 3 branches when checking LazyAND. Right Branch, Skip Right Branch, Continue Branch
+ * 
+ * We also create a temp alloca
+ * 
+ * If the LHS Expression evaluates to FALSE -> We jump to the skip right branch which sets the value of 
+ * of this temp alloca to FALSE.
+ * 
+ * If the LHS Expression evalautes to TRUE -> We jump to the right branch and set the value of this alloca
+ * to the value of the RHS 
+ * 
+ * Then we return the value of this alloca 
+ * 
+ * @param Op Token info for error info 
+ * @param LHS LHS Of Bin Expression
+ * @param RHS RHS Of Bin Expression 
+ * @return llvm::Value* 
+ */
+llvm::Value *CheckLazyAnd(TOKEN Op, std::unique_ptr<ExprAST> LHS, std::unique_ptr<ExprAST> RHS)
+{
+	Function *TheFunction = Builder.GetInsertBlock()->getParent();
+
+	AllocaInst *tmpAlloca = CreateEntryBlockAlloca(TheFunction, "tmpLazy", TypeToLLVM(BOOL_TYPE, Op));
+
+	BasicBlock *RightBB = BasicBlock::Create(TheContext, "RExpr", TheFunction);
+	BasicBlock *SkipRightBB = BasicBlock::Create(TheContext, "SkipRExpr");
+	BasicBlock *ContBB = BasicBlock::Create(TheContext, "Cont");
+
+
+	llvm::Value *BoolRHS;
+	llvm::Value *BoolLHS = ImplicitCasting(LHS->codegen(), TypeToLLVM(BOOL_TYPE, Op), Op);
+
+	Builder.CreateCondBr(BoolLHS, RightBB, SkipRightBB);
+
+	// Eval RHS- Set tmp to RHS Value 
+	TheFunction->getBasicBlockList().push_back(RightBB);
+	Builder.SetInsertPoint(RightBB);
+
+	BoolRHS = ImplicitCasting(RHS->codegen(), TypeToLLVM(BOOL_TYPE, Op), Op);
+	Builder.CreateStore(BoolRHS, tmpAlloca);
+
+	Builder.CreateBr(ContBB);
+
+	// Skip Eval RHS- Set tmp to False 
+	TheFunction->getBasicBlockList().push_back(SkipRightBB);
+	Builder.SetInsertPoint(SkipRightBB);
+
+	Builder.CreateStore(GetConstant(BOOL_TYPE, 0.0f, false), tmpAlloca);
+
+	Builder.CreateBr(ContBB);
+
+	TheFunction->getBasicBlockList().push_back(ContBB);
+	Builder.SetInsertPoint(ContBB);
+
+	return Builder.CreateLoad(TypeToLLVM(BOOL_TYPE, Op), tmpAlloca, "exprBool");
+}
+// ---- LAZY EVAL FUNCTIONS ---- // 
+
+
+
+/// =================================== !! Variable's START !! ================================================ ///
+#pragma region
+class Variable : public ExprAST
+{
+	TOKEN Ident;
+
+public:
+	Variable(TOKEN Ident)
+		: Ident(std::move(Ident)) {}
+
+	virtual void to_string(const std::string &prefix, const std::string &nodeStr, bool isLeft) const override
+	{
+		std::cout << prefix;
+
+		std::cout << (isLeft ? "├──" : "└──");
+
+		std::cout << "Variable: " << Ident.lexeme << std::endl;
+	};
+
+	/**
+	 * @brief Attempts to find referenced variable in any scope level higher or equal to (Or global scope finally)
+	 * If referenced variable not defined already- throw a warning and return a null value.
+	 *
+	 * @return llvm::Value* Value of referenced variable
+	 */
+	llvm::Value *codegen() override
+	{
+		// Look up the values from the scopes, stopping at the deepest layer of scope it finds
+		// If doesn't exist in any scope- try one more time in the global scope
+		// If it doesn't exist in the scope, then it will throw an error.
+
+		for (int i = ScopedNamedValues.size() - 1; i > -1; i--)
+		{
+			if (mapContainsKey(ScopedNamedValues[i], Ident.lexeme))
+			{
+				llvm::AllocaInst *alloca = ScopedNamedValues[i].at(Ident.lexeme);
+				return CheckDefinedAndLoad(alloca, alloca->getAllocatedType(), Ident);
+			}
+		}
+		
+
+		if (mapContainsKey(GlobalVariables, Ident.lexeme))
+		{
+			GlobalVariable *globalAlloca = GlobalVariables.at(Ident.lexeme);
+			return CheckDefinedAndLoad(globalAlloca, globalAlloca->getValueType(), Ident);
+		}
+
+		throw SemanticException("Undecleared variable referenced. Perhaps your variable is out of scope?", Ident.lineNo, Ident.columnNo);
+	};
+};
+
+class VariableDeclAST : public ASTnode
+{
+	VAR_TYPE Type;
+	TOKEN Ident;
+
+public:
+	VariableDeclAST(TOKEN Ident, VAR_TYPE Type)
+		: Ident(std::move(Ident)), Type(std::move(Type)) {}
+
+	virtual void to_string(const std::string &prefix, const std::string &nodeStr, bool isLeft) const override
+	{
+		std::cout << prefix;
+
+		std::cout << (isLeft ? "├──" : "└──");
+
+		std::cout << nodeStr << TypeToStr(Type) << " " << Ident.lexeme << std::endl;
+	};
+
+	/**
+	 * @brief Adds a null decleration of the variable to the stack
+	 * However, throws an error if the program is redeclaring a global variable in the global scope
+	 * It allows the program to redeclare a global variable within a local scope.
+	 *
+	 */
+	llvm::Value *codegen() override
+	{
+		bool isGlobal = ScopedNamedValues.size() == 0;
+		llvm::Type *llvmType = TypeToLLVM(Type, Ident);
+		
+
+		if (isGlobal)
+		{
+			if (mapContainsKey(GlobalVariables, Ident.lexeme))
+			{
+				throw SemanticException("Cannot redeclare global variable.", Ident.lineNo, Ident.columnNo);
+			}
+
+			auto G = new GlobalVariable(*(TheModule.get()), llvmType, false, GlobalValue::CommonLinkage, Constant::getNullValue(llvmType), Ident.lexeme);
+
+			UndefinedVars.insert(Ident.lexeme);
+			GlobalVariables.insert({Ident.lexeme, G});
+		}
+		else
+		{
+			if (mapContainsKey(ScopedNamedValues.back(), Ident.lexeme))
+			{
+				throw SemanticException("Cannot redeclare variable within same scope.", Ident.lineNo, Ident.columnNo);
+			}	
+
+			Function *TheFunction = Builder.GetInsertBlock()->getParent();
+
+			AllocaInst *alloca = CreateEntryBlockAlloca(TheFunction, Ident.lexeme, llvmType); 
+			Builder.CreateStore(Constant::getNullValue(llvmType), alloca);
+
+			UndefinedVars.insert(Ident.lexeme);
+			ScopedNamedValues.back().insert({Ident.lexeme, alloca});
+		}
+
+		return nullptr;
+	};
+};
+
+class VariableAssignmentAST : public ExprAST
+{
+	TOKEN Ident;
+	std::unique_ptr<ExprAST> Expr;
+
+public:
+	VariableAssignmentAST(TOKEN Ident, std::unique_ptr<ExprAST> Expr)
+		: Ident(std::move(Ident)), Expr(std::move(Expr)) {}
+
+	virtual void to_string(const std::string &prefix, const std::string &nodeStr, bool isLeft) const override
+	{
+		std::cout << prefix;
+
+		std::cout << (isLeft ? "├──" : "└──");
+
+		std::cout << "AssignExpr: " << Ident.lexeme << " =" << std::endl;
+
+		Expr->to_string(prefix + (isLeft ? "│   " : "    "), "", false);
+	};
+
+	/**
+	 * @brief Generates the value of the expression of our variable assignment
+	 * Attempts to update the variable (Given it's defined), aswell as throwing warnings for any loss of precision from implicit type casting
+	 *
+	 * If it succesfully updates the value of the variable in it's current scope,
+	 * It must go through all of it's parents scope (and global scope) and update the value there if it exists
+	 *
+	 * Finally we must store the fact that the variable is no longer undefined.
+	 *
+	 * @return llvm::Value* The value of the variable as it may be used as `x=y=z` and needs to propogated
+	 */
+	llvm::Value *codegen() override
+	{
+		llvm::Value *E = Expr->codegen();
+		llvm::Value *CastedValue;
+
+		for (int i = ScopedNamedValues.size() - 1; i > -1; i--)
+		{
+			if (mapContainsKey(ScopedNamedValues[i], Ident.lexeme))
+			{
+
+				llvm::AllocaInst *alloca = ScopedNamedValues[i].at(Ident.lexeme);
+
+				CastedValue = ImplicitCasting(E, alloca->getAllocatedType(), Ident);
+
+				Builder.CreateStore(CastedValue, alloca);
+
+				ScopedNamedValues[i][Ident.lexeme] = alloca;
+				UndefinedVars.erase(Ident.lexeme);
+
+				return CastedValue;
+			}
+		}
+
+		/**
+		 * If we're assining the value of a global variable
+		 *
+		 * It has no higher scope, so we don't need to propagate this change through higher scopes
+		 */
+		if (mapContainsKey(GlobalVariables, Ident.lexeme))
+		{
+
+			GlobalVariable *globalAlloca = GlobalVariables.at(Ident.lexeme);
+
+			CastedValue = ImplicitCasting(E, globalAlloca->getValueType(), Ident);
+
+			Builder.CreateStore(CastedValue, globalAlloca);
+			GlobalVariables[Ident.lexeme] = globalAlloca;
+
+			UndefinedVars.erase(Ident.lexeme);
+			return CastedValue;
+		}
+
+		throw SemanticException("Undecleared variable referenced. Perhaps your variable is out of scope?", Ident.lineNo, Ident.columnNo);
+	};
+};
+#pragma endregion
+/// =================================== !! Variable's END !! ================================================ ///
+
+/// =================================== !! Block & Statements Start !! ================================================ ///
+class ReturnAST : public StmtAST
+{
+	std::unique_ptr<ExprAST> ReturnExpr;
+	TOKEN returnTok; 
+
+public:
+	ReturnAST(std::unique_ptr<ExprAST> ReturnExpr, TOKEN returnTok)
+		: ReturnExpr(std::move(ReturnExpr)), returnTok(std::move(returnTok)) {}
+
+	virtual void to_string(const std::string &prefix, const std::string &nodeStr, bool isLeft) const override
+	{
+		std::cout << prefix;
+
+		std::cout << (isLeft ? "├──" : "└──");
+
+		std::cout << "Return" << std::endl;
+
+		if (ReturnExpr != nullptr)
+		{
+			ReturnExpr->to_string(prefix + (isLeft ? "│   " : "    "), "", false);
+		}
+	};
+
+	/**
+	 * @brief Create a return llvm object if it exists in the code. 
+	 * 
+	 * Must check if the return type is equal to the type of the function.
+	 * 
+	 * @return llvm::Value* 
+	 */
+	llvm::Value *codegen() override
+	{	
+		
+		llvm::Type *FuncReturnType = Builder.getCurrentFunctionReturnType();
+
+		if (ReturnExpr != nullptr)
+		{
+			llvm::Value *RetValue = ReturnExpr->codegen(); 
+			
+			if (RetValue->getType() != FuncReturnType)
+			{
+				throw SemanticException("Incorrect Function Return Type. Expected: " + llvmTypeToStr(FuncReturnType) + " Got: " + llvmTypeToStr(RetValue->getType()), returnTok.lineNo, returnTok.columnNo);
+			}
+
+			Builder.CreateRet(RetValue);
+		}
+		else
+		{
+			if (!(FuncReturnType->isVoidTy()))
+			{
+				throw SemanticException("Incorrect Function Return Type. Expected: " + llvmTypeToStr(FuncReturnType) + " Got: void", returnTok.lineNo, returnTok.columnNo);
+			}
+			Builder.CreateRetVoid();
+		}
+			
+		return GetConstant(BOOL_TYPE, 1.0f, false);
+	};
+
+	/**
+	 * @brief Get the token of the return object.
+	 * 
+	 * @return TOKEN 
+	 */
+	TOKEN getRetTok()
+	{
+		return returnTok;
+	}
+};
+
+class BlockAST : public StmtAST
+{
+	std::vector<std::unique_ptr<VariableDeclAST>> VarDecls;
+	std::vector<std::unique_ptr<StmtAST>> StmtList;
+
+public:
+	BlockAST(std::vector<std::unique_ptr<VariableDeclAST>> VarDecls, std::vector<std::unique_ptr<StmtAST>> StmtList)
+		: VarDecls(std::move(VarDecls)), StmtList(std::move(StmtList)) {}
+
+	virtual void to_string(const std::string &prefix, const std::string &nodeStr, bool isLeft) const override
+	{
+		std::cout << prefix;
+
+		std::cout << (isLeft ? "├──" : "└──");
+
+		std::cout << "Block" << std::endl;
+
+		for (int i = 0; i < VarDecls.size(); i++)
+		{
+			VarDecls[i]->to_string(prefix + (isLeft ? "│   " : "    "), "LocalVarDecl: ", (i != VarDecls.size() - 1) || (StmtList.size() != 0));
+		}
+
+		for (int i = 0; i < StmtList.size(); i++)
+		{
+			StmtList[i]->to_string(prefix + (isLeft ? "│   " : "    "), "", (i != StmtList.size() - 1));
+		}
+	};
+
+	/**
+	 * @brief When we enter a new scope, we must create a new unordered_map for strings to allocas
+	 * Then once this scope is exited, we destroy any variables that are now out of scope
+	 * 
+	 * We must also check if we havn't created any local scopes yet- as we may redeclare function arguments within the body. This isn't allowed by c99 standards 
+	 *
+	 */
+	llvm::Value *codegen() override
+	{
+		bool addScope = !isFuncBlock;
+		llvm::Value *containsReturn;
+
+		// If this block is called from a function defintion
+		// We must NOT add a layer of scope (As it has already been add for arguments)
+		// We must also flip the flag, to allow any subsequent calls to BlockCodeGen create a layer of scope
+		if (addScope)
+		{
+			ScopedNamedValues.push_back(std::unordered_map<std::string, llvm::AllocaInst *>());
+		}
+		else
+		{
+			isFuncBlock = false;
+		}
+		
+		for (auto &varDecl : VarDecls)
+		{
+			varDecl->codegen();
+		}
+
+		int stmtListIdx = -1;
+		for (auto &stmt : StmtList)
+		{	
+			stmtListIdx++;
+
+			/**
+			 * If the current statement is a return statement, throw a warning only if it's not the last statement in a block
+			 * 
+			 * Generate the statement and stop generating any more IR- as this code would never be reached
+			 */
+
+			
+			auto returnStmt = dynamic_cast<ReturnAST*>(stmt.get());
+			if (returnStmt != nullptr){
+
+				if (stmtListIdx != StmtList.size() - 1){
+					addReturnWarning(returnStmt->getRetTok().lineNo, returnStmt->getRetTok().columnNo);
+				}
+
+				stmt->codegen();
+
+				if (addScope){
+					ScopedNamedValues.pop_back();
+				}
+
+				// Just returning any non-null value if we're at a return stmt 
+				return GetConstant(BOOL_TYPE, 1, false);
+			}
+			else 
+			{
+				containsReturn = stmt->codegen();
+			}
+		}
+
+
+		if (addScope){
+			ScopedNamedValues.pop_back();
+		}
+
+		return containsReturn;
+	};
+};
+
+#pragma region
+class IfAST : public StmtAST
+{
+	std::unique_ptr<ExprAST> ConditionExpr;
+	std::unique_ptr<BlockAST> TrueBlock;
+	std::unique_ptr<BlockAST> ElseBlock;
+
+public:
+	IfAST(std::unique_ptr<ExprAST> ConditionExpr, std::unique_ptr<BlockAST> TrueBlock, std::unique_ptr<BlockAST> ElseBlock)
+		: ConditionExpr(std::move(ConditionExpr)), TrueBlock(std::move(TrueBlock)), ElseBlock(std::move(ElseBlock)) {}
+
+	virtual void to_string(const std::string &prefix, const std::string &nodeStr, bool isLeft) const override
+	{
+		std::cout << prefix;
+
+		std::cout << (isLeft ? "├──" : "└──");
+
+		std::cout << "IfStmt" << std::endl;
+
+		ConditionExpr->to_string(prefix + (isLeft ? "│   " : "    "), "", true);
+
+		if (TrueBlock != nullptr)
+		{
+			TrueBlock->to_string(prefix + (isLeft ? "│   " : "    "), "", (ElseBlock != nullptr));
+		}
+
+		if (ElseBlock != nullptr)
+		{
+			ElseBlock->to_string(prefix + (isLeft ? "│   " : "    "), "", false);
+		}
+	};
+
+	/**
+	 * @brief Genereate the expression and coerce it into a boolean
+	 * Generate all the codeblocks for each path in the if statment,
+	 *
+	 * Set appropriate insert points and scopes for each basic block of the if statement
+	 *
+	 */
+	llvm::Value *codegen() override
+	{
+		bool trueBlockReturn = false;
+		bool elseBlockReturn = false;
+
+		Function *TheFunction = Builder.GetInsertBlock()->getParent();
+		llvm::Value *CondValue = ConditionExpr->codegen();
+		llvm::Type *CondType = CondValue->getType();
+
+		CondValue = GetBool(CondValue, CondType, "ifcond");
+
+		BasicBlock *TrueBB = BasicBlock::Create(TheContext, "then", TheFunction);
+		BasicBlock *ElseBB = BasicBlock::Create(TheContext, "else");
+		BasicBlock *MergeBB = BasicBlock::Create(TheContext, "ifcont");
+
+		if (ElseBlock != nullptr)
+		{
+			Builder.CreateCondBr(CondValue, TrueBB, ElseBB);
+		}
+		else
+		{
+			Builder.CreateCondBr(CondValue, TrueBB, MergeBB);
+		}
+
+		// ----- True ------ //
+		ScopedNamedValues.push_back(std::unordered_map<std::string, llvm::AllocaInst *>());
+
+		Builder.SetInsertPoint(TrueBB);
+
+		trueBlockReturn = TrueBlock->codegen() != nullptr;
+
+		Builder.CreateBr(MergeBB);
+
+		TrueBB = Builder.GetInsertBlock();
+
+		ScopedNamedValues.pop_back();
+		// ----- True ------ //
+
+		if (ElseBlock != nullptr)
+		{
+			// ----- False ------ //
+			ScopedNamedValues.push_back(std::unordered_map<std::string, llvm::AllocaInst *>());
+
+			TheFunction->getBasicBlockList().push_back(ElseBB);
+			Builder.SetInsertPoint(ElseBB);
+
+			elseBlockReturn = ElseBlock->codegen() != nullptr;
+
+			Builder.CreateBr(MergeBB);
+			ElseBB = Builder.GetInsertBlock();
+
+			ScopedNamedValues.pop_back();
+			// ----- False ------ //
+		}
+
+		// ----- Continue ------ //
+		TheFunction->getBasicBlockList().push_back(MergeBB);
+		Builder.SetInsertPoint(MergeBB);
+		// ----- Continue ------ //
+
+		// If an if statement gurantees a return statement 
+		// Keep track of this 
+		if (trueBlockReturn && ElseBlock != nullptr && elseBlockReturn)
+		{
+			IfPathsReturn = true; 
+		}
+		else 
+		{
+			IfPathsReturn = false; 
+		}
+
+		return nullptr;
+	};
+};
+
+class WhileAST : public StmtAST
+{
+	std::unique_ptr<ExprAST> ConditionExpr;
+	std::unique_ptr<StmtAST> LoopBlock;
+
+public:
+	WhileAST(std::unique_ptr<ExprAST> ConditionExpr, std::unique_ptr<StmtAST> LoopBlock)
+		: ConditionExpr(std::move(ConditionExpr)), LoopBlock(std::move(LoopBlock)) {}
+
+	virtual void to_string(const std::string &prefix, const std::string &nodeStr, bool isLeft) const override
+	{
+		std::cout << prefix;
+
+		std::cout << (isLeft ? "├──" : "└──");
+
+		std::cout << "WhileLoop" << std::endl;
+		ConditionExpr->to_string(prefix + (isLeft ? "│   " : "    "), "", (LoopBlock != nullptr));
+
+		if (LoopBlock != nullptr)
+		{
+			LoopBlock->to_string(prefix + (isLeft ? "│   " : "    "), "", false);
+		}
+	};
+
+	/**
+	 * @brief Generate 3 branches. The loop header, loop block and loop continue 
+	 * 
+	 * Then create a conditional branch depending on the loop condition (Which is evalualted in the loop header)
+	 * Within the loop body, unconditionally branch to the loop header, this will re-evalulate the condition and correctly exeucte the loop 
+	 * 
+	 * Then continue the remaining code 
+	 * 
+	 * @return llvm::Value* 
+	 */
+	llvm::Value *codegen() override
+	{
+		llvm::Value *CondValue;
+		llvm::Value *BoolCondValue;
+
+		Function *TheFunction = Builder.GetInsertBlock()->getParent();
+
+		BasicBlock *LoopBB = BasicBlock::Create(TheContext, "while");
+		BasicBlock *ContBB = BasicBlock::Create(TheContext, "whilecont");
+		BasicBlock *HeaderBB = BasicBlock::Create(TheContext, "loopcond", TheFunction);
+		
+		// Unconditionally branch to the header and generate condition for the loop
+		Builder.CreateBr(HeaderBB);
+		Builder.SetInsertPoint(HeaderBB);
+
+		CondValue = ConditionExpr->codegen();
+		BoolCondValue = GetBool(CondValue, CondValue->getType(), "whilecond");
+
+		Builder.CreateCondBr(BoolCondValue, LoopBB, ContBB);
+
+		// Generate the code that will be looped 
+		TheFunction->getBasicBlockList().push_back(LoopBB);
+		Builder.SetInsertPoint(LoopBB);
+
+		ScopedNamedValues.push_back(std::unordered_map<std::string, llvm::AllocaInst *>());
+		LoopBlock->codegen();
+		ScopedNamedValues.pop_back();
+
+		//Branch back to checking conditional branch 
+		Builder.CreateBr(HeaderBB);
+
+
+		// Exiting loop and continuing code 
+		TheFunction->getBasicBlockList().push_back(ContBB);
+		Builder.SetInsertPoint(ContBB);
+		return nullptr;
+	};
+};
+
+#pragma endregion
+/// =================================== !! Block & Stmts End !! ================================================ ///
+
+/// =================================== !! Binary / Unary AST Start !! ================================================ ///
+#pragma region
+class BinaryExprAST : public ExprAST
+{
+	TOKEN Op;
+	std::unique_ptr<ExprAST> LHS;
+	std::unique_ptr<ExprAST> RHS;
+
+public:
+	BinaryExprAST(TOKEN Op, std::unique_ptr<ExprAST> LHS, std::unique_ptr<ExprAST> RHS)
+		: Op(std::move(Op)), LHS(std::move(LHS)), RHS(std::move(RHS)) {}
+
+	virtual void to_string(const std::string &prefix, const std::string &nodeStr, bool isLeft) const override
+	{
+		std::cout << prefix;
+
+		std::cout << (isLeft ? "├──" : "└──");
+
+		std::cout << "BinaryExpr: " << Op.lexeme << std::endl;
+
+		LHS->to_string(prefix + (isLeft ? "│   " : "    "), "", true);
+		RHS->to_string(prefix + (isLeft ? "│   " : "    "), "", false);
+	};
+
+	/**
+	 * @brief Generates the LHS, RHS of the binary expression
+	 * And depending on the highest level type of the hirearchy coerces the other type.
+	 *
+	 * Then generates the correct binary expression depending on the type.
+	 *
+	 * @return llvm::Value*
+	 */
+	llvm::Value *codegen() override
+	{
+		llvm::Value *BinExprVal;
+		llvm::Type *HighestPrecisionType;
+		llvm::Value *CastedLHS;
+		llvm::Value *CastedRHS;
+
+		/**
+		 * Not generating the implicit cast for AND/OR as that will be done 
+		 * Later for the case of lazy evaluation. 
+		 */
+		switch (Op.type)
+		{
+		case AND:
+		case OR:
+			break;
+		case EQ:
+		case NE:
+		case LE:
+		case LT:
+		case GE:
+		case GT:
+		case PLUS:
+		case MINUS:
+		case ASTERIX:
+		case DIV:
+		case MOD:
+		{
+			llvm::Value *LHSVal = LHS->codegen();
+			llvm::Value *RHSVal = RHS->codegen();
+
+			HighestPrecisionType = GetHighestPrecisionType(LHSVal->getType(), RHSVal->getType());
+
+			CastedLHS = ImplicitCasting(LHSVal, HighestPrecisionType, Op);
+			CastedRHS = ImplicitCasting(RHSVal, HighestPrecisionType, Op);
+			break;
+		}
+		default:
+			throw SemanticException("Invalid Binary Operator", Op.lineNo, Op.columnNo);
+		}
+
+		/**
+		 * If we are creating an expression for && or || we can try to apply lazy evaluation 
+		 * 
+		 * We can create basic blocks, and branch to either evaluating the RHS or just continuing the block. 
+		 * Depending on the outcome of the LHS. 
+		 * 
+		 * We just need to store the value in the temporary alloca 
+		 *
+		 *
+		 * If we have (True || ...) -> We don't have to evaluate RHS. So we can branch to the continue block
+		 * If we have (False && ...) -> We don't have to evalaute RHS. So we can branch to the continue block÷
+		 */
+
+		switch (Op.type)
+		{
+		case OR:
+			return CheckLazyOr(Op, std::move(LHS), std::move(RHS));
+		case AND:
+			return CheckLazyAnd(Op, std::move(LHS), std::move(RHS));
+		case PLUS:
+			if (HighestPrecisionType->isFloatTy())
+			{
+				BinExprVal = Builder.CreateFAdd(CastedLHS, CastedRHS, "faddtmp");
+			}
+			else
+			{
+				BinExprVal = Builder.CreateAdd(CastedLHS, CastedRHS, "addtmp");
+			}
+
+			break;
+		case MINUS:
+			if (HighestPrecisionType->isFloatTy())
+			{
+				BinExprVal = Builder.CreateFSub(CastedLHS, CastedRHS, "fsubtmp");
+			}
+			else
+			{
+				BinExprVal = Builder.CreateSub(CastedLHS, CastedRHS, "subtmp");
+			}
+			
+			break;
+		case ASTERIX:
+			if (HighestPrecisionType->isFloatTy())
+			{
+				BinExprVal = Builder.CreateFMul(CastedLHS, CastedRHS, "fmultmp");
+			}
+			else
+			{
+				BinExprVal = Builder.CreateMul(CastedLHS, CastedRHS, "multmp");
+			}
+
+			break;
+		case DIV:
+			if (HighestPrecisionType->isFloatTy())
+			{
+				BinExprVal = Builder.CreateFDiv(CastedLHS, CastedRHS, "fdivtmp");
+			}
+			else if (HighestPrecisionType->isIntegerTy(1))
+			{
+				BinExprVal = Builder.CreateUDiv(CastedLHS, CastedRHS, "udivtmp");
+			}
+			else if (HighestPrecisionType->isIntegerTy(32))
+			{
+				BinExprVal = Builder.CreateSDiv(CastedLHS, CastedRHS, "sdivtmp");
+			}
+
+			break;
+		case MOD:
+			if (HighestPrecisionType->isFloatTy())
+			{
+				BinExprVal = Builder.CreateFRem(CastedLHS, CastedRHS, "fmodtmp");
+			}
+			else if (HighestPrecisionType->isIntegerTy(1))
+			{
+				BinExprVal = Builder.CreateURem(CastedLHS, CastedRHS, "umodtmp");
+			}
+			else if (HighestPrecisionType->isIntegerTy(32))
+			{
+				BinExprVal = Builder.CreateSRem(CastedLHS, CastedRHS, "smodtmp");
+			}
+
+			break;
+		case EQ:
+			if (HighestPrecisionType->isFloatTy())
+			{
+				BinExprVal = Builder.CreateFCmpOEQ(CastedLHS, CastedRHS, "feqtmp");
+			}
+			else
+			{
+				BinExprVal = Builder.CreateICmpEQ(CastedLHS, CastedRHS, "ieqtmp");
+			}
+
+			break;
+		case NE:
+			if (HighestPrecisionType->isFloatTy())
+			{
+				BinExprVal = Builder.CreateFCmpONE(CastedLHS, CastedRHS, "fneqtmp");
+			}
+			else
+			{
+				BinExprVal = Builder.CreateICmpNE(CastedLHS, CastedRHS, "ineqtmp");
+			}
+
+			break;
+		case LE:
+			if (HighestPrecisionType->isFloatTy())
+			{
+				BinExprVal = Builder.CreateFCmpOLE(CastedLHS, CastedRHS, "flteqtmp");
+			}
+			else if (HighestPrecisionType->isIntegerTy(1))
+			{
+				BinExprVal = Builder.CreateICmpULE(CastedLHS, CastedRHS, "blteqtmp");
+			}
+			else if (HighestPrecisionType->isIntegerTy(32))
+			{
+				BinExprVal = Builder.CreateICmpSLE(CastedLHS, CastedRHS, "ilteqtmp");
+			}
+
+			break;
+		case LT:
+			if (HighestPrecisionType->isFloatTy())
+			{
+				BinExprVal = Builder.CreateFCmpOLT(CastedLHS, CastedRHS, "flttmp");
+			}
+			else if (HighestPrecisionType->isIntegerTy(1))
+			{
+				BinExprVal = Builder.CreateICmpULT(CastedLHS, CastedRHS, "blttmp");
+			}
+			else if (HighestPrecisionType->isIntegerTy(32))
+			{
+				BinExprVal = Builder.CreateICmpSLT(CastedLHS, CastedRHS, "ilttmp");
+			}
+
+			break;
+		case GE:
+			if (HighestPrecisionType->isFloatTy())
+			{
+				BinExprVal = Builder.CreateFCmpOGE(CastedLHS, CastedRHS, "fgteqtmp");
+			}
+			else if (HighestPrecisionType->isIntegerTy(1))
+			{
+				BinExprVal = Builder.CreateICmpUGE(CastedLHS, CastedRHS, "bgteqtmp");
+			}
+			else if (HighestPrecisionType->isIntegerTy(32))
+			{
+				BinExprVal = Builder.CreateICmpSGE(CastedLHS, CastedRHS, "igteqtmp");
+			}
+
+			break;
+		case GT:
+			if (HighestPrecisionType->isFloatTy())
+			{
+				BinExprVal = Builder.CreateFCmpOGT(CastedLHS, CastedRHS, "fgttmp");
+			}
+			else if (HighestPrecisionType->isIntegerTy(1))
+			{
+				BinExprVal = Builder.CreateICmpUGT(CastedLHS, CastedRHS, "bgttmp");
+			}
+			else if (HighestPrecisionType->isIntegerTy(32))
+			{
+				BinExprVal = Builder.CreateICmpSGT(CastedLHS, CastedRHS, "Igttmp");
+			}
+
+			break;
+		default:
+			throw SemanticException("Invalid Binary Operator", Op.lineNo, Op.columnNo);
+		}
+
+		return BinExprVal;
+	};
+};
+
+class UnaryExprAST : public ExprAST
+{
+	TOKEN Op;
+	std::unique_ptr<ExprAST> Expr;
+
+public:
+	UnaryExprAST(TOKEN Op, std::unique_ptr<ExprAST> Expr)
+		: Op(std::move(Op)), Expr(std::move(Expr)) {}
+
+	virtual void to_string(const std::string &prefix, const std::string &nodeStr, bool isLeft) const override
+	{
+		std::cout << prefix;
+
+		std::cout << (isLeft ? "├──" : "└──");
+
+		std::cout << "UnaryExpr: " << Op.lexeme << std::endl;
+
+		Expr->to_string(prefix + (isLeft ? "│   " : "    "), "", false);
+	};
+
+	/**
+	 * @brief Generates the Value of the given unary expression. Performs appropriate type casting
+	 *
+	 * @return llvm::Value*
+	 */
+	llvm::Value *codegen() override
+	{
+		llvm::Value *E = Expr->codegen();
+		llvm::Value *UnaryExpr;
+		llvm::Value *CastedValue = E;
+		switch (Op.type)
+		{
+		case MINUS:
+			// Only need to cast a -foo if `foo` is a boolean.
+			// Since -int and -float are semantically correct
+			if (E->getType()->isIntegerTy(1))
+			{
+				CastedValue = ImplicitCasting(E, TypeToLLVM(BOOL_TYPE, Op), Op);
+				UnaryExpr = Builder.CreateNeg(CastedValue, "bminustmp");
+			}
+			else if (E->getType()->isIntegerTy(32))
+			{
+				UnaryExpr = Builder.CreateNeg(E, "fminustmp");
+			}
+			else if (E->getType()->isFloatTy())
+			{
+				UnaryExpr = Builder.CreateFNeg(E, "iminustmp");
+			}
+
+			break;
+		case NOT:
+			// Must cast both an int and a float to bool before we apply negation to it
+			if (!E->getType()->isIntegerTy(1))
+			{
+				CastedValue = ImplicitCasting(E, TypeToLLVM(BOOL_TYPE, Op), Op);
+				UnaryExpr = Builder.CreateNot(CastedValue, "finottmp");
+			}
+			else
+			{
+				UnaryExpr = Builder.CreateNot(E, "nottmp");
+			}
+
+			break;
+		default:
+			throw SemanticException("Unexepected unary operator", Op.lineNo, Op.columnNo);
+		}
+
+		return UnaryExpr;
+	};
+};
+#pragma endregion
+/// =================================== !! Binary / Unary AST End !! ================================================ ///
+
+/// =================================== !! Functions Start !! ================================================ ///
+#pragma region
+class ParamAST : public ASTnode
+{
+	VAR_TYPE Type;
+	TOKEN Ident;
+
+public:
+	ParamAST(TOKEN Ident, VAR_TYPE Type)
+		: Type(std::move(Type)), Ident(std::move(Ident)) {}
+
+	virtual void to_string(const std::string &prefix, const std::string &nodeStr, bool isLeft) const override
+	{
+		std::cout << prefix;
+
+		std::cout << (isLeft ? "├──" : "└──");
+
+		std::cout << nodeStr << TypeToStr(Type) << " " << Ident.lexeme << std::endl;
+	};
+
+	llvm::Value *codegen() override
+	{
+		return nullptr;
+	};
+
+	VAR_TYPE getType()
+	{
+		return Type;
+	}
+	TOKEN getIdent()
+	{
+		return Ident;
+	}
+};
+
+class FuncCallAST : public ExprAST
+{
+	TOKEN FuncName;
+	std::vector<std::unique_ptr<ExprAST>> Args;
+
+public:
+	FuncCallAST(TOKEN FuncName, std::vector<std::unique_ptr<ExprAST>> Args)
+		: FuncName(std::move(FuncName)), Args(std::move(Args)) {}
+
+	virtual void to_string(const std::string &prefix, const std::string &nodeStr, bool isLeft) const override
+	{
+		std::cout << prefix;
+
+		std::cout << (isLeft ? "├──" : "└──");
+
+		std::cout << "FuncCall: " << FuncName.lexeme << std::endl;
+
+		for (int i = 0; i < Args.size(); i++)
+		{
+			Args[i]->to_string(prefix + (isLeft ? "│   " : "    "), "", (i != Args.size() - 1));
+		}
+	}
+
+	/**
+	 * @brief Ensures the function call is valid and generates the values
+	 *
+	 * @return llvm::Value* The value generated from the function call
+	 */
+	llvm::Value *codegen() override
+	{
+		Function *CalleeFunc = TheModule->getFunction(FuncName.lexeme);
+
+		if (!CalleeFunc)
+		{
+			throw SemanticException("Unknown Function Referenced. Perhaps you have misspelt your function.", FuncName.lineNo, FuncName.columnNo);
+		}
+
+		if (Args.size() != CalleeFunc->arg_size())
+		{
+			throw SemanticException("Invalid Argument Size. Expected " + std::to_string(CalleeFunc->arg_size()) + ". Got " + std::to_string(Args.size()), FuncName.lineNo, FuncName.columnNo);
+		}
+
+		std::vector<Value *> ArgsV;
+		llvm::Type *funcArgType; 
+
+		int idx = 0; 
+		for (auto &Arg : Args)
+		{
+			llvm::Value *argExpr = Arg->codegen();
+			funcArgType = CalleeFunc->getArg(idx++)->getType();
+
+			argExpr = ImplicitCasting(argExpr, funcArgType, FuncName, " in Function Call (" + FuncName.lexeme + ")");
+
+			ArgsV.push_back(argExpr);
+		}
+
+		return Builder.CreateCall(CalleeFunc, ArgsV, "calltmp");
+	};
+};
+
+class FuncDeclAST : public ASTnode
+{
+	VAR_TYPE Type;
+	TOKEN Ident;
+	std::vector<std::unique_ptr<ParamAST>> Params;
+
+	// May be null - in the case of extern
+	std::unique_ptr<BlockAST> FuncBlock;
+
+public:
+	FuncDeclAST(TOKEN Ident, VAR_TYPE Type, std::vector<std::unique_ptr<ParamAST>> Params, std::unique_ptr<BlockAST> FuncBlock)
+		: Ident(std::move(Ident)), Type(std::move(Type)), Params(std::move(Params)), FuncBlock(std::move(FuncBlock)) {}
+
+	virtual void to_string(const std::string &prefix, const std::string &nodeStr, bool isLeft) const override
+	{
+		std::cout << prefix;
+
+		std::cout << (isLeft ? "├──" : "└──");
+
+		std::cout << nodeStr << TypeToStr(Type) << " " << Ident.lexeme << std::endl;
+
+		for (int i = 0; i < Params.size(); i++)
+		{
+			Params[i]->to_string(prefix + (isLeft ? "│  " : "    "), "Param: ", (i != Params.size() - 1) || (FuncBlock != nullptr));
+		}
+		if (FuncBlock != nullptr)
+		{
+			FuncBlock->to_string(prefix + (isLeft ? "│  " : "    "), "Block", false);
+		}
+	};
+
+	/**
+	 * @brief Generate prototype if function doesn't already exist, and add a new-level of scope
+	 * 
+	 * Also perform checks to see if all code paths in a function contain a return in a non-void function.
+	 *
+	 * @return llvm::Function* The function prototype and body generated
+	 */
+	llvm::Function *codegen() override
+	{	
+		llvm::FunctionType *FT;
+		llvm::Function *FuncDef;
+		std::vector<llvm::Type *> Args;
+		
+		bool FuncContainsReturn = false; 
+		IfStmtLast = false;
+
+		Function *ExternFuncDef = TheModule->getFunction(Ident.lexeme);
+		
+		/**
+		 * Generating IR for function Prototype if it doesn't already exist
+		 */
+		if (!ExternFuncDef)
+		{
+			for (auto &Param : Params)
+			{
+				llvm::Type *type = TypeToLLVM(Param->getType(), Ident);
+				Args.push_back(type);
+			}
+
+			// FunctionType::get has different arguments for no-argument functions
+			if (Args.size() == 0)
+			{
+				FT = FunctionType::get(TypeToLLVM(Type, Ident), false);
+			}
+			else
+			{
+				FT = FunctionType::get(TypeToLLVM(Type, Ident), Args, false);
+			}
+
+			FuncDef = Function::Create(FT, Function::ExternalLinkage, Ident.lexeme, TheModule.get());
+
+			int Idx = 0;
+			for (auto &Arg : FuncDef->args())
+			{
+				Arg.setName(Params[Idx++]->getIdent().lexeme);
+			}
+
+			// In the case of __Defining__ an extern function
+			// We do not create a BasicBlock for a body
+			// We just return the prototype
+			if (FuncBlock == nullptr)
+			{
+				return FuncDef;
+			}
+		}
+
+
+		BasicBlock *BB = BasicBlock::Create(TheContext, "entry", FuncDef);
+		Builder.SetInsertPoint(BB);
+
+
+		// Create a new level of scope
+		std::unordered_map<std::string, llvm::AllocaInst *> FuncScope;
+		ScopedNamedValues.push_back(FuncScope);
+
+		for (auto &Arg : FuncDef->args())
+		{
+			llvm::AllocaInst *Alloca = CreateEntryBlockAlloca(FuncDef, Arg.getName().data(), Arg.getType());
+			Builder.CreateStore(&Arg, Alloca);
+
+			ScopedNamedValues.back()[Arg.getName().data()] = Alloca;
+		}
+
+		// Flag used to check if we need to add another layer of scope
+		isFuncBlock = true; 
+
+		FuncContainsReturn = FuncBlock->codegen() != nullptr;
+		
+		bool AllPathsReturn = IfPathsReturn || FuncContainsReturn;
+		llvm::Type *FuncReturnType = Builder.getCurrentFunctionReturnType();
+
+		// If the function isn't void
+		// and not all paths return a value this must throw an exception
+		if (!AllPathsReturn)
+		{
+			if (FuncReturnType->isVoidTy())
+			{
+				Builder.CreateRetVoid();
+			}
+			else
+			{
+				throw SemanticException("Not all code paths return value in non-void function.", Ident.lineNo, Ident.columnNo);
+			}
+		}
+		
+		/**
+		 * Need to create empty return value if a if-statement will gurantee a return from a function.
+		 */
+		if (IfPathsReturn && !FuncContainsReturn){
+			if (!IfStmtLast){
+				Warnings.push_back(Warning("\033[0;33mWarning:\033[0m Any code after if-statement may not be reachable in Function: "+Ident.lexeme, Ident.lineNo, Ident.columnNo));
+			}
+			
+			if (FuncReturnType->isVoidTy())
+			{
+				Builder.CreateRetVoid();
+			}
+			else if (FuncReturnType->isFloatTy())
+			{
+				Builder.CreateRet(GetConstant(FLOAT_TYPE, 0.0f));
+			}
+			else if (FuncReturnType->isIntegerTy(1))
+			{
+				Builder.CreateRet(GetConstant(BOOL_TYPE, 0.0f, false));
+			}
+			else if (FuncReturnType->isIntegerTy(32))
+			{
+				Builder.CreateRet(GetConstant(INT_TYPE, 0.0f, true));
+			}
+		}
+
+		llvm::verifyFunction(*FuncDef);
+
+		ScopedNamedValues.pop_back();
+		return FuncDef;
+	};
+};
+
+#pragma endregion
+/// =================================== !! Functions End !! ================================================ ///
+
+/// ==================================== Program & Decls START !! =============================================== ///
+#pragma region
+class DeclAST : public ASTnode
+{
+	std::unique_ptr<FuncDeclAST> FuncDecl;
+	std::unique_ptr<VariableDeclAST> VarDecl;
+
+public:
+	DeclAST(std::unique_ptr<FuncDeclAST> FuncDecl, std::unique_ptr<VariableDeclAST> VarDecl)
+		: FuncDecl(std::move(FuncDecl)), VarDecl(std::move(VarDecl)) {}
+
+	virtual void to_string(const std::string &prefix, const std::string &nodeStr, bool isLeft) const override
+	{
+		if (FuncDecl != nullptr)
+		{
+			FuncDecl->to_string(prefix, "GlobalFuncDef: ", isLeft);
+		}
+		if (VarDecl != nullptr)
+		{
+			VarDecl->to_string(prefix, "GlobalVarDecl: ", isLeft);
+		}
+	};
+
+	/**
+	 * @brief Generates the function declerations and all the variable declerations
+	 * 
+	 * @return llvm::Value* 
+	 */
+	llvm::Value *codegen() override
+	{
+		if (FuncDecl != nullptr)
+		{
+			FuncDecl->codegen();
+		}
+
+		if (VarDecl != nullptr)
+		{
+			VarDecl->codegen();
+		}
+		return nullptr;
+	};
+};
+
+class ProgramAST : public ASTnode
+{
+	std::vector<std::unique_ptr<FuncDeclAST>> ExternList;
+	std::vector<std::unique_ptr<DeclAST>> DeclList;
+
+public:
+	ProgramAST(std::vector<std::unique_ptr<FuncDeclAST>> ExternList, std::vector<std::unique_ptr<DeclAST>> DeclList)
+		: ExternList(std::move(ExternList)), DeclList(std::move(DeclList)) {}
+
+	virtual void to_string(const std::string &prefix, const std::string &nodeStr, bool isLeft) const override
+	{
+
+		std::cout << nodeStr << std::endl;
+
+		for (int i = 0; i < ExternList.size(); i++)
+		{
+			ExternList[i]->to_string(prefix + (isLeft ? "│   " : "    "), "ExternFunc: ", (i != ExternList.size() - 1) || (DeclList.size() != 0));
+		}
+
+		for (int i = 0; i < DeclList.size(); i++)
+		{
+			DeclList[i]->to_string(prefix + (isLeft ? "│   " : "    "), "GlobalDecl", (i != DeclList.size() - 1));
+		}
+	};
+
+	/**
+	 * @brief Genereates all the extern declerations and the function/variable decelerations 
+	 * 
+	 * @return llvm::Value* 
+	 */
+	llvm::Value *codegen() override
+	{
+		for (auto &Extern : ExternList)
+		{
+			Extern->codegen();
+		}
+
+		for (auto &Decl : DeclList)
+		{
+			Decl->codegen();
+		}
+		return nullptr;
+	};
+};
+#pragma endregion
+/// =================================== !! Program & Decls END !! ================================================ ///
+
+/// =================================== !! Literal AST Start !! ================================================ ///
+#pragma region
+
+class IntegerAST : public ExprAST
+{
+	TOKEN Val;
+
+public:
+	IntegerAST(TOKEN Val)
+		: Val(std::move(Val)) {}
+
+	virtual void to_string(const std::string &prefix, const std::string &nodeStr, bool isLeft) const override
+	{
+		std::cout << prefix;
+
+		std::cout << (isLeft ? "├──" : "└──");
+
+		std::cout << "Int Literal: " << Val.lexeme << std::endl;
+	};
+
+	/**
+	 * @brief Returns constant int value
+	 *
+	 * @return llvm::Value*
+	 */
+	llvm::Value *codegen() override
+	{
+		return GetConstant(INT_TYPE, std::stof(Val.lexeme), true);
+	};
+};
+class FloatAST : public ExprAST
+{
+	TOKEN Val;
+
+public:
+	FloatAST(TOKEN Val)
+		: Val(std::move(Val)) {}
+
+	virtual void to_string(const std::string &prefix, const std::string &nodeStr, bool isLeft) const override
+	{
+		std::cout << prefix;
+
+		std::cout << (isLeft ? "├──" : "└──");
+
+		std::cout << "Float Literal: " << Val.lexeme << std::endl;
+	};
+
+	/**
+	 * @brief Returns constant float value
+	 *
+	 * @return llvm::Value*
+	 */
+	llvm::Value *codegen() override
+	{	
+		return GetConstant(FLOAT_TYPE, std::stof(Val.lexeme));
+	};
+};
+
+class BoolAST : public ExprAST
+{
+	TOKEN Val;
+
+public:
+	BoolAST(TOKEN Val)
+		: Val(std::move(Val)) {}
+
+	virtual void to_string(const std::string &prefix, const std::string &nodeStr, bool isLeft) const override
+	{
+		std::cout << prefix;
+
+		std::cout << (isLeft ? "├──" : "└──");
+
+		std::cout << "Bool Literal: " << Val.lexeme << std::endl;
+	};
+
+	/**
+	 * @brief Returns constant bool value
+	 *
+	 * @return llvm::Value*
+	 */
+	llvm::Value *codegen() override
+	{
+		float boolVal = (Val.lexeme == "false" ? 0.0f : 1.0f);
+		
+		return GetConstant(BOOL_TYPE, boolVal, false);
+	};
+};
+#pragma endregion
+/// =================================== !! Literal AST End !! ================================================ ///
+
+//===----------------------------------------------------------------------===//
+// Recursive Descent Parser - Function call for each production
+//===----------------------------------------------------------------------===//
+
+// ----- Function Declerations Start ----- //
+#pragma region
+static void Arg_List_Prime();
+static std::vector<std::unique_ptr<ExprAST>> Arg_List();
+static std::vector<std::unique_ptr<ExprAST>> Args();
+static void Arg_List_Prime(std::vector<std::unique_ptr<ExprAST>> &args);
+static std::vector<std::unique_ptr<ExprAST>> Arg_List();
+static std::vector<std::unique_ptr<ExprAST>> Args();
+static std::unique_ptr<ExprAST> Rval_Term();
+static std::vector<std::unique_ptr<ExprAST>> Rval_Ident_Prime();
+static std::unique_ptr<ExprAST> Rval_Ident();
+static std::unique_ptr<ExprAST> Rval_Par();
+static std::unique_ptr<ExprAST> Rval_Neg();
+static std::unique_ptr<ExprAST> Rval_Mul_Prime(std::unique_ptr<ExprAST> LHS);
+static std::unique_ptr<ExprAST> Rval_Mul();
+static std::unique_ptr<ExprAST> Rval_Add_Prime(std::unique_ptr<ExprAST> LHS);
+static std::unique_ptr<ExprAST> Rval_Add();
+static std::unique_ptr<ExprAST> Rval_Cmp_Prime(std::unique_ptr<ExprAST> LHS);
+static std::unique_ptr<ExprAST> Rval_Cmp();
+static std::unique_ptr<ExprAST> Rval_Eq_Prime(std::unique_ptr<ExprAST> LHS);
+static std::unique_ptr<ExprAST> Rval_Eq();
+static std::unique_ptr<ExprAST> Rval_And_Prime(std::unique_ptr<ExprAST> LHS);
+static std::unique_ptr<ExprAST> Rval_And();
+static std::unique_ptr<ExprAST> Rval_Or_Prime(std::unique_ptr<ExprAST> LHS);
+static std::unique_ptr<ExprAST> Rval_Or();
+static std::unique_ptr<ExprAST> Expr();
+static std::unique_ptr<ReturnAST> Return_Stmt_Prime();
+static std::unique_ptr<ReturnAST> Return_Stmt();
+static std::unique_ptr<BlockAST> Else_Stmt();
+static std::unique_ptr<IfAST> If_Stmt();
+static std::unique_ptr<WhileAST> While_Stmt();
+static std::unique_ptr<ExprAST> Expr_Stmt();
+static std::unique_ptr<StmtAST> Stmt();
+static void Stmt_List(std::vector<std::unique_ptr<StmtAST>> &stmt_list);
+static std::unique_ptr<VariableDeclAST> Local_Decl();
+static void Local_Decls(std::vector<std::unique_ptr<VariableDeclAST>> &variable_decls);
+static std::unique_ptr<BlockAST> Block();
+static std::unique_ptr<ParamAST> Param();
+static void Param_List_Prime(std::vector<std::unique_ptr<ParamAST>> &param_list);
+static std::vector<std::unique_ptr<ParamAST>> Param_List();
+static std::vector<std::unique_ptr<ParamAST>> Params();
+static VAR_TYPE Var_Type();
+static VAR_TYPE Type_Spec();
+static void Decl_Prime(std::unique_ptr<FuncDeclAST> &func_decl, std::unique_ptr<VariableDeclAST> &var_decl, VAR_TYPE type, const std::string &ident);
+static std::unique_ptr<DeclAST> Decl();
+static void Decl_List_Prime(std::unique_ptr<DeclAST> &decl_list);
+static std::vector<std::unique_ptr<DeclAST>> Decl_List();
+static std::unique_ptr<FuncDeclAST> Extern();
+static void Extern_List_Prime(std::vector<std::unique_ptr<FuncDeclAST>> &extern_list);
+static std::vector<std::unique_ptr<FuncDeclAST>> Extern_List();
+static std::unique_ptr<ProgramAST> Program();
+#pragma endregion
+// ----- Function Declerations End ----- //
+
+// ----- Helper Functions ------ //
+#pragma region
+/**
+ * @brief Checks if the current token is the same as the expected token. If not an error is thrown
+ *
+ * @param expectedTokenType
+ * @param errMessage
+ * @param prodRule
+ */
+static void Match(TOKEN_TYPE expectedTokenType, string errMessage, const char *prodRule = __builtin_FUNCTION())
+{
+	if (CurTok.type != expectedTokenType)
+	{
+		throw ParseException("\033[0;31mInvalid Token Error:\033[0m " + errMessage);
+	}
+	getNextToken();
+}
+
+/**
+ * @brief Get the Ident And Match object
+ *
+ * @param CurTok
+ * @return TOKEN Token of identifer if no error, otherwise an error is a thrown
+ */
+static TOKEN GetIdentAndMatch()
+{
+	TOKEN prev_token = CurTok;
+	Match(IDENT, "Expected identifer token. ");
+	return prev_token;
+}
+
+/**
+ * @brief Looks at the next token in the queue without removing it
+ *
+ * @return TOKEN Next token in the queue
+ */
+static TOKEN PeekToken()
+{
+	TOKEN tmpToken = CurTok;
+
+	TOKEN nextToken = getNextToken();
+	putBackToken(nextToken);
+
+	CurTok = tmpToken;
+
+	return nextToken;
+}
+
+
+/**
+ * @brief Checks if the current token's type is one of the valid types
+ *
+ * @return true
+ * @return false
+ */
+static bool ValidType()
+{
+	switch (CurTok.type)
+	{
+	case BOOL_TOK:
+	case FLOAT_TOK:
+	case INT_TOK:
+		return true;
+	default:
+		return false;
+	}
+}
+
+/**
+ * @brief Checks if the current token is a valid token for starting an expression
+ *
+ * @return true
+ * @return false
+ */
+static bool ValidExprStart()
+{
+	switch (CurTok.type)
+	{
+	case BOOL_LIT:
+	case FLOAT_LIT:
+	case INT_LIT:
+	case LPAR:
+	case IDENT:
+	case NOT:
+	case MINUS:
+		return true;
+	default:
+		return false;
+	}
+}
+
+#pragma endregion
+// ------- Helper Functions End ------- //
+
+#pragma region
+
+// arg_list_prime ::= "," expr arg_list_prime | epsilon
+static void Arg_List_Prime(std::vector<std::unique_ptr<ExprAST>> &args)
+{
+	if (CurTok.type == RPAR)
+	{
+		return;
+	}
+
+	if (CurTok.type == COMMA)
+	{
+		Match(COMMA, "Expected ',' after argument");
+		auto arg = Expr();
+		args.push_back(std::move(arg));
+
+		Arg_List_Prime(args);
+	}
+	else
+	{
+		throw ParseException("Invalid Token Error: \nExpected: End of Function Call or New Argument. ");
+	}
+}
+
+// arg_list ::= expr arg_list_prime
+static std::vector<std::unique_ptr<ExprAST>> Arg_List()
+{
+	std::vector<std::unique_ptr<ExprAST>> args;
+
+	if (ValidExprStart())
+	{
+		auto expr = Expr();
+		args.push_back(std::move(expr));
+
+		Arg_List_Prime(args);
+	}
+	else
+	{
+		throw ParseException("Invalid Token Error: \nExpected: Function Argument. ");
+	}
+
+	return args;
+}
+
+// args ::= arg_list |  epsilon
+static std::vector<std::unique_ptr<ExprAST>> Args()
+{
+	std::vector<std::unique_ptr<ExprAST>> args;
+
+	if (ValidExprStart())
+	{
+		args = Arg_List();
+	}
+	else if (CurTok.type != RPAR)
+	{
+		throw ParseException("Invalid Token Error: \nExpected: Function Argument or End of Function Call. ");
+	}
+
+	return args;
+}
+
+// rval_term ::= INT_LIT | FLOAT_LIT | BOOL_LIT
+static std::unique_ptr<ExprAST> Rval_Term()
+{
+	std::unique_ptr<ExprAST> expr;
+	TOKEN lit_tok = CurTok;
+
+	switch (CurTok.type)
+	{
+	case BOOL_LIT:
+	{
+		Match(BOOL_LIT, "Expected bool literal. ");
+
+		expr = std::make_unique<BoolAST>(std::move(lit_tok));
+		break;
+	}
+	case FLOAT_LIT:
+	{
+		Match(FLOAT_LIT, "Expected float literal. ");
+
+		expr = std::make_unique<FloatAST>(std::move(lit_tok));
+		break;
+	}
+	case INT_LIT:
+	{
+		Match(INT_LIT, "Expected int literal. ");
+
+		expr = std::make_unique<IntegerAST>(std::move(lit_tok));
+		break;
+	}
+	default:
+		throw ParseException("Invalid Token Error: \nExpected: Literal. ");
+	}
+
+	return expr;
+}
+
+// rval_ident_prime ::= epsilon | "(" args ")"
+static std::unique_ptr<ExprAST> Rval_Ident_Prime(TOKEN ident)
+{
+	std::vector<std::unique_ptr<ExprAST>> args;
+	std::unique_ptr<ExprAST> expr;
+
+	switch (CurTok.type)
+	{
+	case COMMA:
+	case RPAR:
+	case SC:
+	case OR:
+	case AND:
+	case EQ:
+	case NE:
+	case LT:
+	case GT:
+	case LE:
+	case GE:
+	case PLUS:
+	case MOD:
+	case DIV:
+	case ASTERIX:
+	case MINUS:
+		expr = std::make_unique<Variable>(std::move(ident));
+		break;
+	case LPAR:
+	{
+		Match(LPAR, "Expected '(' before function call. ");
+		args = Args();
+		Match(RPAR, "Expected ')' after function call. ");
+
+		expr = std::make_unique<FuncCallAST>(std::move(ident), std::move(args));
+		break;
+	}
+	default:
+		throw ParseException("Invalid Token Error: \nExpected: One Of [',' New Argument, ')' End of Arguments, ';' End of Expression] or Operation. ");
+	}
+
+	return expr;
+}
+
+// rval_ident ::= IDENT rval_ident_prime | rval_term
+static std::unique_ptr<ExprAST> Rval_Ident()
+{
+	std::unique_ptr<ExprAST> expr;
+
+	if (CurTok.type == BOOL_LIT || CurTok.type == FLOAT_LIT || CurTok.type == INT_LIT)
+	{
+		expr = Rval_Term();
+	}
+	else if (CurTok.type == IDENT)
+	{
+		TOKEN ident = GetIdentAndMatch();
+
+		expr = Rval_Ident_Prime(std::move(ident));
+	}
+	else
+	{
+		throw ParseException("Invalid Token Error: \nExpected: Variable, Literal or Function Call. ");
+	}
+
+	return expr;
+}
+
+// rval_par ::= "(" expr ")" | rval_ident
+static std::unique_ptr<ExprAST> Rval_Par()
+{
+	std::unique_ptr<ExprAST> expr;
+	switch (CurTok.type)
+	{
+	case BOOL_LIT:
+	case FLOAT_LIT:
+	case INT_LIT:
+	case IDENT:
+	{
+		expr = Rval_Ident();
+		break;
+	}
+	case LPAR:
+	{
+		Match(LPAR, "Expected '(' before expression. ");
+		expr = Expr();
+		Match(RPAR, "Expected ')' after expression. ");
+		break;
+	}
+	default:
+		throw ParseException("Invalid Token Error: \nExpected: Start of Expression. ");
+	}
+
+	return expr;
+}
+
+// rval_neg ::= "-" rval_neg | "!" rval_neg | rval_par
+static std::unique_ptr<ExprAST> Rval_Neg()
+{
+	std::unique_ptr<ExprAST> unary_expr;
+	TOKEN Op_Token = CurTok;
+
+	switch (CurTok.type)
+	{
+	case BOOL_LIT:
+	case FLOAT_LIT:
+	case INT_LIT:
+	case LPAR:
+	case IDENT:
+	{
+		unary_expr = Rval_Par();
+		break;
+	}
+	case NOT:
+	{
+		Match(NOT, "Expected '!' operator. ");
+
+		auto expr = Rval_Neg();
+
+		unary_expr = std::make_unique<UnaryExprAST>(std::move(Op_Token), std::move(expr));
+		break;
+	}
+	case MINUS:
+	{
+		Match(MINUS, "Expected '-' operator. ");
+
+		auto expr = Rval_Neg();
+
+		unary_expr = std::make_unique<UnaryExprAST>(std::move(Op_Token), std::move(expr));
+		break;
+	}
+	default:
+		throw ParseException("Invalid Token Error: \nExpected: Start of Expression. ");
+	}
+
+	return unary_expr;
+}
+
+// rval_mul_prime ::= "*" rval_neg  | "/" rval_neg  | "%" rval_neg | epsilon
+static std::unique_ptr<ExprAST> Rval_Mul_Prime(std::unique_ptr<ExprAST> LHS)
+{
+	// cout << "Rval_Mul_Prime" << endl;
+	std::unique_ptr<ExprAST> LHS_Prime;
+	std::unique_ptr<ExprAST> RHS;
+	std::unique_ptr<ExprAST> expr;
+	TOKEN Op_Token = CurTok;
+
+	switch (CurTok.type)
+	{
+	case COMMA:
+	case RPAR:
+	case SC:
+	case OR:
+	case AND:
+	case EQ:
+	case NE:
+	case LT:
+	case GT:
+	case LE:
+	case GE:
+	case PLUS:
+	case MINUS:
+		expr = std::move(LHS);
+		break;
+	case MOD:
+	{
+		Match(MOD, "Expected '%' operator. ");
+
+		LHS_Prime = Rval_Neg();
+		RHS = Rval_Mul_Prime(std::move(LHS));
+
+		expr = std::make_unique<BinaryExprAST>(std::move(Op_Token), std::move(LHS_Prime), std::move(RHS));
+		break;
+	}
+	case DIV:
+	{
+		Match(DIV, "Expected '/' operator. ");
+
+		LHS_Prime = Rval_Neg();
+		RHS = Rval_Mul_Prime(std::move(LHS));
+
+		expr = std::make_unique<BinaryExprAST>(std::move(Op_Token), std::move(LHS_Prime), std::move(RHS));
+		break;
+	}
+	case ASTERIX:
+	{
+		Match(ASTERIX, "Expected '*' operator. ");
+
+		LHS_Prime = Rval_Neg();
+		RHS = Rval_Mul_Prime(std::move(LHS));
+
+		expr = std::make_unique<BinaryExprAST>(std::move(Op_Token), std::move(LHS_Prime), std::move(RHS));
+		break;
+	}
+	default:
+		throw ParseException("Invalid Token Error: \nExpected: One Of [',' New Argument, ')' End of Arguments, ';' End of Expression] or Operation. ");
+	}
+	return expr;
+}
+
+// rval_mul ::= rval_neg rval_mul_prime
+static std::unique_ptr<ExprAST> Rval_Mul()
+{
+	std::unique_ptr<ExprAST> LHS = Rval_Neg();
+
+	while (CurTok.type == ASTERIX || CurTok.type == MOD || CurTok.type == DIV){
+		TOKEN op = CurTok;
+		getNextToken();
+
+		auto RHS = Rval_Neg();
+
+		LHS = std::make_unique<BinaryExprAST>(op, std::move(LHS), std::move(RHS));
+	}
+	
+	return Rval_Mul_Prime(std::move(LHS));
+}
+
+// rval_add_prime ::= "+" rval_mul  | "-" rval_mul | epsilon
+static std::unique_ptr<ExprAST> Rval_Add_Prime(std::unique_ptr<ExprAST> LHS)
+{
+	// cout << "Rval_Add_Prime" << endl;
+	std::unique_ptr<ExprAST> LHS_Prime;
+	std::unique_ptr<ExprAST> RHS;
+	std::unique_ptr<ExprAST> expr;
+	TOKEN Op_Token = CurTok;
+
+	switch (CurTok.type)
+	{
+	case COMMA:
+	case RPAR:
+	case SC:
+	case OR:
+	case AND:
+	case EQ:
+	case NE:
+	case LT:
+	case GT:
+	case LE:
+	case GE:
+		expr = std::move(LHS);
+		break;
+	case PLUS:
+	{
+		Match(PLUS, "Expected '+' operator. ");
+
+		LHS_Prime = Rval_Mul();
+		RHS = Rval_Add_Prime(std::move(LHS));
+
+		expr = std::make_unique<BinaryExprAST>(std::move(Op_Token), std::move(LHS_Prime), std::move(RHS));
+		break;
+	}
+	case MINUS:
+	{
+		Match(MINUS, "Expected '-' operator. ");
+
+		LHS_Prime = Rval_Mul();
+		RHS = Rval_Add_Prime(std::move(LHS));
+
+		expr = std::make_unique<BinaryExprAST>(std::move(Op_Token), std::move(LHS_Prime), std::move(RHS));
+		break;
+	}
+	default:
+		throw ParseException("Invalid Token Error: \nExpected: One Of [',' New Argument, ')' End of Arguments, ';' End of Expression] or Operation. ");
+	}
+	return expr;
+}
+
+// rval_add ::= rval_mul rval_add_prime
+static std::unique_ptr<ExprAST> Rval_Add()
+{
+	std::unique_ptr<ExprAST> LHS = Rval_Mul();
+	
+	while (CurTok.type == PLUS || CurTok.type == MINUS){
+		TOKEN op = CurTok;
+		getNextToken();
+
+		auto RHS = Rval_Mul();
+
+		LHS = std::make_unique<BinaryExprAST>(op, std::move(LHS), std::move(RHS));
+	}
+
+	return Rval_Add_Prime(std::move(LHS));
+}
+
+// rval_cmp_prime ::= "<=" rval_add | "<" rval_add | ">=" rval_add | ">" rval_add | epsilon
+static std::unique_ptr<ExprAST> Rval_Cmp_Prime(std::unique_ptr<ExprAST> LHS)
+{
+	std::unique_ptr<ExprAST> LHS_Prime;
+	std::unique_ptr<ExprAST> RHS;
+	std::unique_ptr<ExprAST> expr;
+	TOKEN Op_Token = CurTok;
+
+	switch (CurTok.type)
+	{
+	case COMMA:
+	case RPAR:
+	case SC:
+	case OR:
+	case AND:
+	case EQ:
+	case NE:
+		expr = std::move(LHS);
+		break;
+	case LT:
+	{
+		Match(LT, "Expected '<' operator. ");
+
+		LHS_Prime = Rval_Add();
+		RHS = Rval_Cmp_Prime(std::move(LHS));
+
+		expr = std::make_unique<BinaryExprAST>(std::move(Op_Token), std::move(LHS_Prime), std::move(RHS));
+		break;
+	}
+	case GT:
+	{
+		Match(GT, "Expected '>' operator. ");
+
+		LHS_Prime = Rval_Add();
+		RHS = Rval_Cmp_Prime(std::move(LHS));
+
+		expr = std::make_unique<BinaryExprAST>(std::move(Op_Token), std::move(LHS_Prime), std::move(RHS));
+		break;
+	}
+	case LE:
+	{
+		Match(LE, "Expected '<=' operator. ");
+
+		LHS_Prime = Rval_Add();
+		RHS = Rval_Cmp_Prime(std::move(LHS));
+
+		expr = std::make_unique<BinaryExprAST>(std::move(Op_Token), std::move(LHS_Prime), std::move(RHS));
+		break;
+	}
+	case GE:
+	{
+		Match(GE, "Exepcted '>=' operator. ");
+
+		LHS_Prime = Rval_Add();
+		RHS = Rval_Cmp_Prime(std::move(LHS));
+
+		expr = std::make_unique<BinaryExprAST>(std::move(Op_Token), std::move(LHS_Prime), std::move(RHS));
+		break;
+	}
+	default:
+		throw ParseException("Invalid Token Error: \nExpected: One Of [',' New Argument, ')' End of Arguments, ';' End of Expression] or Operation. ");
+	}
+	return expr;
+}
+
+// rval_cmp ::= rval_add rval_cmp_prime
+static std::unique_ptr<ExprAST> Rval_Cmp()
+{
+	std::unique_ptr<ExprAST> LHS = Rval_Add();
+	
+	while (CurTok.type == LT || CurTok.type == LE || CurTok.type == GT || CurTok.type == GE){
+		TOKEN op = CurTok;
+		getNextToken();
+
+		auto RHS = Rval_Add();
+
+		LHS = std::make_unique<BinaryExprAST>(op, std::move(LHS), std::move(RHS));
+	}
+
+	return Rval_Cmp_Prime(std::move(LHS));
+}
+
+// rval_eq_prime ::= "==" rval_cmp | "!=" rval_cmp | epsilon
+static std::unique_ptr<ExprAST> Rval_Eq_Prime(std::unique_ptr<ExprAST> LHS)
+{
+	std::unique_ptr<ExprAST> LHS_Prime;
+	std::unique_ptr<ExprAST> RHS;
+	std::unique_ptr<ExprAST> expr;
+	TOKEN Op_Token = CurTok;
+
+	switch (CurTok.type)
+	{
+	case COMMA:
+	case RPAR:
+	case SC:
+	case OR:
+	case AND:
+		expr = std::move(LHS);
+		break;
+	case EQ:
+	{
+		Match(EQ, "Expected '==' operator. ");
+
+		LHS_Prime = Rval_Cmp();
+		RHS = Rval_Eq_Prime(std::move(LHS));
+
+		expr = std::make_unique<BinaryExprAST>(std::move(Op_Token), std::move(LHS_Prime), std::move(RHS));
+		break;
+	}
+	case NE:
+	{
+		Match(NE, "Expected '!=' operator. ");
+
+		LHS_Prime = Rval_Cmp();
+		RHS = Rval_Eq_Prime(std::move(LHS));
+
+		expr = std::make_unique<BinaryExprAST>(std::move(Op_Token), std::move(LHS_Prime), std::move(RHS));
+		break;
+	}
+	default:
+		throw ParseException("Invalid Token Error: \nExpected: One Of [',' New Argument, ')' End of Arguments, ';' End of Expression] or Operation. ");
+	}
+
+	return expr;
+}
+
+// rval_eq ::= rval_cmp rval_eq_prime
+static std::unique_ptr<ExprAST> Rval_Eq()
+{
+	std::unique_ptr<ExprAST> LHS = Rval_Cmp();
+	
+	while (CurTok.type == EQ || CurTok.type == NE){
+		TOKEN op = CurTok;
+		getNextToken();
+
+		auto RHS = Rval_Cmp();
+
+		LHS = std::make_unique<BinaryExprAST>(op, std::move(LHS), std::move(RHS));
+	}
+
+	return Rval_Eq_Prime(std::move(LHS));
+}
+
+// rval_and_prime ::= "&&" rval_eq rval_and_prime | epsilon
+static std::unique_ptr<ExprAST> Rval_And_Prime(std::unique_ptr<ExprAST> LHS)
+{
+	std::unique_ptr<ExprAST> LHS_Prime;
+	std::unique_ptr<ExprAST> RHS;
+	std::unique_ptr<ExprAST> expr;
+	TOKEN Op_Token = CurTok;
+
+	switch (CurTok.type)
+	{
+	case COMMA:
+	case RPAR:
+	case SC:
+	case OR:
+		expr = std::move(LHS);
+		break;
+	case AND:
+	{
+		Match(AND, "Expected '&&' operator. ");
+
+		LHS_Prime = Rval_Eq();
+		RHS = Rval_And_Prime(std::move(LHS));
+
+		expr = std::make_unique<BinaryExprAST>(std::move(Op_Token), std::move(LHS_Prime), std::move(RHS));
+		
+		break;
+	}
+	default:
+		throw ParseException("Invalid Token Error: \nExpected: One Of [',' New Argument, ')' End of Arguments, ';' End of Expression] or Operation. ");
+	}
+	return expr;
+}
+
+// rval_and ::= rval_eq rval_and_prime
+static std::unique_ptr<ExprAST> Rval_And()
+{
+	std::unique_ptr<ExprAST> LHS = Rval_Eq();
+
+	while (CurTok.type == AND){
+		TOKEN op = CurTok;
+		getNextToken();
+
+		auto RHS = Rval_Eq();
+
+		LHS = std::make_unique<BinaryExprAST>(op, std::move(LHS), std::move(RHS));
+	}
+	
+	return Rval_And_Prime(std::move(LHS));
+}
+
+// rval_or_prime ::= "||" rval_and rval_or_prime | epsilon
+static std::unique_ptr<ExprAST> Rval_Or_Prime(std::unique_ptr<ExprAST> LHS)
+{
+	std::unique_ptr<ExprAST> LHS_Prime;
+	std::unique_ptr<ExprAST> RHS;
+	std::unique_ptr<ExprAST> expr;
+	TOKEN Op_Token = CurTok;
+
+	switch (CurTok.type)
+	{
+	case COMMA:
+	case RPAR:
+	case SC:
+		expr = std::move(LHS);
+		break;
+	case OR:
+	{
+		Match(OR, "Expected '||' operator. ");
+
+		LHS_Prime = Rval_And();
+		RHS = Rval_Or_Prime(std::move(LHS));
+
+		expr = std::make_unique<BinaryExprAST>(std::move(Op_Token), std::move(LHS_Prime), std::move(RHS));
+		break;
+	}
+	default:
+		throw ParseException("Invalid Token Error: \nExpected: One Of [',' New Argument, ')' End of Arguments, ';' End of Expression] or Operation. ");
+	}
+
+	return expr;
+}
+
+// rval_or ::= rval_and rval_or_prime
+static std::unique_ptr<ExprAST> Rval_Or()
+{
+	std::unique_ptr<ExprAST> LHS = Rval_And();
+	
+	while (CurTok.type == OR){
+		TOKEN op = CurTok;
+		getNextToken();
+
+		auto RHS = Rval_And();
+
+		LHS = std::make_unique<BinaryExprAST>(op, std::move(LHS), std::move(RHS));
+	}
+
+	return Rval_Or_Prime(std::move(LHS));
+}
+
+// expr ::= IDENT "=" expr | rval_or
+static std::unique_ptr<ExprAST> Expr()
+{
+	std::unique_ptr<ExprAST> expr;
+
+	switch (CurTok.type)
+	{
+	case BOOL_LIT:
+	case FLOAT_LIT:
+	case INT_LIT:
+	case LPAR:
+	case NOT:
+	case MINUS:
+	{
+		expr = Rval_Or();
+		break;
+	}
+	// Non LL(1) production
+	// Must use extra look-ahead
+	case IDENT:
+	{
+		TOKEN NextTok = PeekToken();
+
+		if (NextTok.type == ASSIGN)
+		{
+			TOKEN ident = GetIdentAndMatch();
+
+			Match(ASSIGN, "Expected '=' after variable identifer. ");
+
+			auto var_expr = Expr();
+
+			expr = std::make_unique<VariableAssignmentAST>(std::move(ident), std::move(var_expr));
+		}
+		else
+		{
+			expr = Rval_Or();
+		}
+
+		break;
+	}
+	case SC:
+	{
+		Match(SC, "Expected ';'. ");
+		break;
+	}
+	default:
+		throw ParseException("Invalid Token Error: \nExpected: Expected Assignment or Start of Expression. ");
+	}
+	return expr;
+}
+
+// return_stmt_prime ::= ";" | expr ";"
+static std::unique_ptr<ReturnAST> Return_Stmt_Prime()
+{
+	std::unique_ptr<ExprAST> expr;
+	TOKEN returnTok; 
+	if (ValidExprStart())
+	{
+		expr = Expr();
+
+		returnTok = CurTok;
+		Match(SC, "Expected ';' after return expression. ");
+	}
+	else if (CurTok.type == SC)
+	{
+		returnTok = CurTok;
+		Match(SC, "Expected ';' after return keyword. ");
+	}
+	else
+	{
+		throw ParseException("Invalid Token Error: \nExpected: Start of expression. ");
+	}
+
+	return std::make_unique<ReturnAST>(std::move(expr), std::move(returnTok));
+}
+
+// return_stmt ::= "return" return_stmt_prime
+static std::unique_ptr<ReturnAST> Return_Stmt()
+{
+	std::unique_ptr<ReturnAST> return_stmt;
+
+	if (CurTok.type == RETURN)
+	{
+		Match(RETURN, "Expected 'return' keyword. ");
+		return_stmt = Return_Stmt_Prime();
+	}
+	else
+	{
+		throw ParseException("Invalid Token Error: \nExpected: {RETURN}");
+	}
+
+	return return_stmt;
+}
+
+// else_stmt  ::= "else" block | epsilon
+static std::unique_ptr<BlockAST> Else_Stmt()
+{
+	std::unique_ptr<BlockAST> else_block;
+
+	switch (CurTok.type)
+	{
+	case BOOL_LIT:
+	case FLOAT_LIT:
+	case INT_LIT:
+	case LPAR:
+	case NOT:
+	case MINUS:
+	case IDENT:
+	case SC:
+	case RETURN:
+	case IF:
+	case WHILE:
+	case LBRA:
+	case RBRA:
+		break;
+	case ELSE:
+	{
+		Match(ELSE, "Expected 'else' keyword after if statement. ");
+		else_block = Block();
+		break;
+	}
+	default:
+		throw ParseException("Invalid Token Error: \nExpected: Else block of IF Statment or New Valid Statement ");
+	}
+
+	return else_block;
+}
+
+// if_stmt ::= "if" "(" expr ")" block else_stmt
+static std::unique_ptr<IfAST> If_Stmt()
+{
+	std::unique_ptr<ExprAST> condition_expr;
+	std::unique_ptr<BlockAST> true_block;
+	std::unique_ptr<BlockAST> else_block;
+
+	if (CurTok.type == IF)
+	{
+		Match(IF, "Expected 'if' keyword. ");
+		Match(LPAR, "Expected '(' before if condition. ");
+
+		condition_expr = Expr();
+
+		Match(RPAR, "Expected ')' after if condition. ");
+
+		true_block = Block();
+		else_block = Else_Stmt();
+	}
+	else
+	{
+		throw ParseException("Invalid Token Error: \nExpected: 'if' keyword. ");
+	}
+
+	return std::make_unique<IfAST>(std::move(condition_expr), std::move(true_block), std::move(else_block));
+}
+
+// while_stmt ::= "while" "(" expr ")" stmt
+static std::unique_ptr<WhileAST> While_Stmt()
+{
+	std::unique_ptr<ExprAST> condition_expr;
+	std::unique_ptr<StmtAST> loop_block;
+
+	if (CurTok.type == WHILE)
+	{
+		Match(WHILE, "Expected 'While' keyword. ");
+		Match(LPAR, "Expected '(' before loop condition. ");
+
+		condition_expr = Expr();
+
+		Match(RPAR, "Expected ')' after loop condition. ");
+
+		loop_block = Stmt();
+	}
+	else
+	{
+		throw ParseException("Invalid Token Error: \nExpected: 'while' keyword. ");
+	}
+
+	return std::make_unique<WhileAST>(std::move(condition_expr), std::move(loop_block));
+}
+
+// expr_stmt ::= expr ";" | ";"
+static std::unique_ptr<ExprAST> Expr_Stmt()
+{
+	std::unique_ptr<ExprAST> expr;
+	if (ValidExprStart())
+	{
+		expr = Expr();
+		Match(SC, "Expected ';' after expression. ");
+	}
+	else if (CurTok.type == SC)
+	{
+		Match(SC, "Expected ';' after expression. ");
+	}
+	else
+	{
+		throw ParseException("Invalid Token Error: \nExpected: Start of expression. ");
+	}
+
+	return expr;
+}
+
+// stmt ::= expr_stmt |  block |  if_stmt |  while_stmt |  return_stmt
+static std::unique_ptr<StmtAST> Stmt()
+{
+	std::unique_ptr<StmtAST> stmt;
+
+	if (ValidExprStart() || CurTok.type == SC)
+	{
+		stmt = Expr_Stmt();
+	}
+	else if (CurTok.type == RETURN)
+	{
+		stmt = Return_Stmt();
+	}
+	else if (CurTok.type == IF)
+	{
+		stmt = If_Stmt();
+	}
+	else if (CurTok.type == WHILE)
+	{
+		stmt = While_Stmt();
+	}
+	else if (CurTok.type == LBRA)
+	{
+		stmt = Block();
+	}
+	else
+	{
+		throw ParseException("Invalid Token Error: \nExpected: One Of [IfStatment, WhileLoop, ReturnStmt, '{' (Start of New Block), Expression]");
+	}
+
+	return stmt;
+}
+
+// stmt_list ::= stmt stmt_list | epsilon
+static void Stmt_List(std::vector<std::unique_ptr<StmtAST>> &stmt_list)
+{
+
+	switch (CurTok.type)
+	{
+	case BOOL_LIT:
+	case FLOAT_LIT:
+	case INT_LIT:
+	case LPAR:
+	case IDENT:
+	case NOT:
+	case MINUS:
+	case SC:
+	case RETURN:
+	case IF:
+	case WHILE:
+	case LBRA:
+	{
+		auto stmt = Stmt();
+
+		if (stmt != nullptr)
+		{
+			stmt_list.push_back(std::move(stmt));
+		}
+
+		Stmt_List(stmt_list);
+		break;
+	}
+	case RBRA:
+		break;
+	default:
+		throw ParseException("Invalid Token Error: \nCannot declare variables after a statement. ");
+	}
+}
+
+// local_decl ::= var_type IDENT ";"
+static std::unique_ptr<VariableDeclAST> Local_Decl()
+{
+	VAR_TYPE type;
+	TOKEN ident;
+
+	if (ValidType())
+	{
+		type = Var_Type();
+		ident = GetIdentAndMatch();
+
+		Match(SC, "Expeceted ';' after variable decleration. ");
+	}
+	else
+	{
+		throw ParseException("Invalid Token Error: \nExpected: Type decleration. ");
+	}
+
+	return std::make_unique<VariableDeclAST>(std::move(ident), std::move(type));
+}
+
+// local_decls ::= local_decl local_decls | epsilon
+static void Local_Decls(std::vector<std::unique_ptr<VariableDeclAST>> &variable_decls)
+{
+
+	switch (CurTok.type)
+	{
+	case BOOL_LIT:
+	case FLOAT_LIT:
+	case INT_LIT:
+	case LPAR:
+	case IDENT:
+	case NOT:
+	case MINUS:
+	case SC:
+	case RETURN:
+	case IF:
+	case WHILE:
+	case LBRA:
+	case RBRA:
+		break;
+	case BOOL_TOK:
+	case FLOAT_TOK:
+	case INT_TOK:
+	{
+		auto decl = Local_Decl();
+		variable_decls.push_back(std::move(decl));
+
+		Local_Decls(variable_decls);
+		break;
+	}
+	default:
+		throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS, SC, RETURN, IF, WHILE, RBRA, LBRA, BOOL_TOK, FLOAT_TOK, INT_TOK}");
+	}
+}
+
+// block ::= "{" local_decls stmt_list "}"
+static std::unique_ptr<BlockAST> Block()
+{
+	std::vector<std::unique_ptr<VariableDeclAST>> variable_decls;
+	std::vector<std::unique_ptr<StmtAST>> stmt_list;
+
+	if (CurTok.type == LBRA)
+	{
+		Match(LBRA, "Expected '{' to declare new scope. ");
+
+		Local_Decls(variable_decls);
+		Stmt_List(stmt_list);
+
+		Match(RBRA, "Expected '}' after statement. ");
+	}
+	else
+	{
+		throw ParseException("Invalid Token Error: \nExpected: '{' to declare new scope. ");
+	}
+
+	return std::make_unique<BlockAST>(std::move(variable_decls), std::move(stmt_list));
+}
+
+// param ::= var_type IDENT
+static std::unique_ptr<ParamAST> Param()
+{
+	VAR_TYPE type;
+	TOKEN ident;
+
+	if (ValidType())
+	{
+		type = Var_Type();
+		ident = GetIdentAndMatch();
+	}
+	else
+	{
+		throw ParseException("Invalid Token Error: \nExpected: Parameter type decleration. ");
+	}
+
+	return std::make_unique<ParamAST>(std::move(ident), std::move(type));
+}
+
+// param_list_prime ::= "," param param_list_prime | epsilon
+static void Param_List_Prime(std::vector<std::unique_ptr<ParamAST>> &param_list)
+{
+	if (CurTok.type == RPAR)
+	{
+		return;
+	}
+
+	if (CurTok.type == COMMA)
+	{
+		Match(COMMA, "Expected ',' or ')' after function parameter");
+		auto param = Param();
+		param_list.push_back(std::move(param));
+
+		Param_List_Prime(param_list);
+	}
+	else
+	{
+		throw ParseException("Invalid Token Error: \nExpected: ',' or ')' in function paramters");
+	}
+}
+
+// param_list ::= param param_list_prime
+static std::vector<std::unique_ptr<ParamAST>> Param_List()
+{
+	std::vector<std::unique_ptr<ParamAST>> param_list;
+
+	if (ValidType())
+	{
+		auto param = Param();
+		param_list.push_back(std::move(param));
+
+		Param_List_Prime(param_list);
+	}
+	else
+	{
+		throw ParseException("Invalid Token Error: \nExpected: Paramter Type. ");
+	}
+
+	return param_list;
+}
+
+// params ::= param_list |  "void" | epsilon
+static std::vector<std::unique_ptr<ParamAST>> Params()
+{
+	std::vector<std::unique_ptr<ParamAST>> param_list;
+
+	if (CurTok.type == RPAR)
+	{
+		return param_list;
+	}
+
+	if (CurTok.type == VOID_TOK)
+	{
+		Match(VOID_TOK, "Expected 'void' token in function paramters");
+	}
+	else if (ValidType())
+	{
+		param_list = Param_List();
+	}
+	else
+	{
+		throw ParseException("Invalid Token Error: \nExpected: End of Paramters or Paramter Type. ");
+	}
+
+	return param_list;
+}
+
+// var_type  ::= "int" |  "float" |  "bool"
+static VAR_TYPE Var_Type()
+{
+	VAR_TYPE type;
+
+	if (CurTok.type == BOOL_TOK)
+	{
+		Match(BOOL_TOK, "Expected 'bool' keyword.");
+		type = BOOL_TYPE;
+	}
+	else if (CurTok.type == FLOAT_TOK)
+	{
+		Match(FLOAT_TOK, "Expected 'float' keyword.");
+		type = FLOAT_TYPE;
+	}
+	else if (CurTok.type == INT_TOK)
+	{
+		Match(INT_TOK, "Expected 'int' keyword.");
+		type = INT_TYPE;
+	}
+	else
+	{
+		throw ParseException("Invalid Token Error: \nExpected: Variable type decleration. ");
+	}
+
+	return type;
+}
+
+// type_spec ::= "void" | var_type
+static VAR_TYPE Type_Spec()
+{
+	VAR_TYPE type;
+
+	if (CurTok.type == VOID_TOK)
+	{
+		Match(VOID_TOK, "Expected 'void' keyword.");
+		type = VOID_TYPE;
+	}
+	else if (ValidType())
+	{
+		type = Var_Type();
+	}
+	else
+	{
+		throw ParseException("Invalid Token Error: \nExpected: Type decleration. ");
+	}
+
+	return type;
+}
+
+// decl_prime ::= ";" | "(" params ")" block
+static void Decl_Prime(std::unique_ptr<FuncDeclAST> &func_decl, std::unique_ptr<VariableDeclAST> &var_decl, VAR_TYPE type, TOKEN ident)
+{
+
+	if (CurTok.type == LPAR)
+	{
+		Match(LPAR, "Expected '(' after function decleration. ");
+
+		auto params = Params();
+
+		Match(RPAR, "Expected ')' after function paramters. ");
+
+		auto block = Block();
+
+		func_decl = std::make_unique<FuncDeclAST>(std::move(ident), std::move(type), std::move(params), std::move(block));
+	}
+	else if (CurTok.type == SC)
+	{
+		Match(SC, "Expected ';' after variable decleration. ");
+
+		var_decl = std::make_unique<VariableDeclAST>(std::move(ident), std::move(type));
+	}
+	else
+	{
+		throw ParseException("Invalid Token Error: \nExpected: ';' or Function Paramters");
+	}
+}
+
+// decl ::= var_type IDENT decl_prime | "void" IDENT "(" params ")" block
+static std::unique_ptr<DeclAST> Decl()
+{
+	std::unique_ptr<FuncDeclAST> func_decl;
+	std::unique_ptr<VariableDeclAST> var_decl;
+
+	if (CurTok.type == VOID_TOK)
+	{
+		Match(VOID_TOK, "Expected 'void' token before function decleration. ");
+
+		TOKEN ident = GetIdentAndMatch();
+
+		Match(LPAR, "Expeceted '(' after function identifer. ");
+
+		auto params = Params();
+
+		Match(RPAR, "Expected ')' after parameter list. ");
+
+		auto block = Block();
+
+		func_decl = std::make_unique<FuncDeclAST>(std::move(ident), std::move(VOID_TYPE), std::move(params), std::move(block));
+	}
+	else if (ValidType())
+	{
+		auto type = Var_Type();
+
+		TOKEN ident = GetIdentAndMatch();
+
+		Decl_Prime(func_decl, var_decl, type, ident);
+	}
+	else
+	{
+		throw ParseException("Invalid Token Error: \nExpected: Variable or Function type decleration");
+	}
+
+	return std::make_unique<DeclAST>(std::move(func_decl), std::move(var_decl));
+}
+
+// decl_list_prime ::= decl decl_list_prime | epsilon
+static void Decl_List_Prime(std::vector<std::unique_ptr<DeclAST>> &decl_list)
+{
+	if (CurTok.type == EOF_TOK)
+	{
+		return;
+	}
+
+	if (ValidType() || CurTok.type == VOID_TOK)
+	{
+		auto decl = Decl();
+		decl_list.push_back(std::move(decl));
+
+		Decl_List_Prime(decl_list);
+	}
+	else
+	{
+		throw ParseException("Invalid Token Error: \nExpected: decleration type or end_of_file");
+	}
+}
+
+// decl_list ::= decl decl_list_prime
+static std::vector<std::unique_ptr<DeclAST>> Decl_List()
+{
+	std::vector<std::unique_ptr<DeclAST>> decl_list;
+
+	if (ValidType() || CurTok.type == VOID_TOK)
+	{
+		auto decl = Decl();
+		decl_list.push_back(std::move(decl));
+
+		Decl_List_Prime(decl_list);
+	}
+	else
+	{
+		throw ParseException("Invalid Token Error: \nExpected Variable or Function type decleration. ");
+	}
+
+	return decl_list;
+};
+
+// extern ::= "extern" type_spec IDENT "(" params ")" ";"
+static std::unique_ptr<FuncDeclAST> Extern()
+{
+	TOKEN ident;
+	VAR_TYPE type;
+	std::vector<std::unique_ptr<ParamAST>> params;
+	std::unique_ptr<BlockAST> emptyblock;
+
+	if (CurTok.type == EXTERN)
+	{
+		Match(EXTERN, "EXTERN");
+
+		type = Type_Spec();
+
+		ident = GetIdentAndMatch();
+
+		Match(LPAR, "Expected '(' after identifer keyword.");
+		params = Params();
+		Match(RPAR, "Expected ')' after function paramters.");
+
+		Match(SC, "Expected ';' after function definition.");
+	}
+	else
+	{
+		throw ParseException("Invalid Token Error: \nExpected 'extern' keyword. ");
+	}
+
+	return std::make_unique<FuncDeclAST>(std::move(ident), std::move(type), std::move(params), std::move(emptyblock));
+}
+
+// extern_list_prime ::= extern extern_list_prime | epsilon
+static void Extern_List_Prime(std::vector<std::unique_ptr<FuncDeclAST>> &extern_list)
+{
+
+	if (ValidType() || CurTok.type == VOID_TOK)
+	{
+		return;
+	}
+
+	if (CurTok.type == EXTERN)
+	{
+		auto e = Extern();
+		extern_list.push_back(std::move(e));
+
+		Extern_List_Prime(extern_list);
+	}
+	else
+	{
+		throw ParseException("Invalid Token Error: \nExpected: 'extern' keyword or extern function type. ");
+	}
+}
+
+// extern_list ::= extern extern_list_prime
+static std::vector<std::unique_ptr<FuncDeclAST>> Extern_List()
+{
+	std::vector<std::unique_ptr<FuncDeclAST>> extern_list;
+
+	if (CurTok.type == EXTERN)
+	{
+		auto e = Extern();
+		extern_list.push_back(std::move(e));
+
+		Extern_List_Prime(extern_list);
+	}
+	else
+	{
+		throw ParseException("Invalid Token Error: \nExpected 'extern' Keyword. ");
+	}
+
+	return extern_list;
+};
+
+// program ::= extern_list decl_list | decl_list
+static std::unique_ptr<ProgramAST> Program()
+{
+	std::vector<std::unique_ptr<FuncDeclAST>> extern_list;
+	std::vector<std::unique_ptr<DeclAST>> decl_list;
+
+	if (ValidType() || CurTok.type == VOID_TOK)
+	{
+		decl_list = Decl_List();
+	}
+	else if (CurTok.type == EXTERN)
+	{
+		extern_list = Extern_List();
+		decl_list = Decl_List();
+	}
+	else
+	{
+		throw ParseException("Invalid Token Error: \nExpected: Extern declerations or Function declerations. ");
+	}
+
+	return std::make_unique<ProgramAST>(std::move(extern_list), std::move(decl_list));
+}
+
+#pragma endregion
+
+
+// Global variables to be turned on and off at the markers will
+static bool PRINT_AST = true;
+static bool TERMINAL_IR = false;
+static bool WARNINGS = true; 
+
+
+
+static std::unique_ptr<ProgramAST> root;
+
+/**
+ * @brief Attempts to create a Root Program AST Node
+ * Any syntax errors are thrown and caught and reported,
+ *
+ * If no syntax errors exist, the AST Printer is ran and prints the AST for the given program
+ *
+ */
+static void parser()
+{
+	getNextToken();
+	try
+	{
+		root = Program();
+
+		if (CurTok.type != EOF_TOK)
+		{
+			throw ParseException("Invalid Token Error: \nExpected: end_of_file. ");
+		}
+
+		if (PRINT_AST)
+		{
+			// AST Printer
+			root->to_string("", "Program", false);
+		}
+	}
+	catch (const std::exception &e)
+	{
+		std::cout << e.what() << std::endl
+				  << "Got: " << CurTok.lexeme << " line: " << CurTok.lineNo << " col: " << CurTok.columnNo << endl;
+		exit(1);
+	}
+}
+
+//===----------------------------------------------------------------------===//
+// Code Generation
+//===----------------------------------------------------------------------===//
+
+//===----------------------------------------------------------------------===//
+// Main driver code.
+//===----------------------------------------------------------------------===//
+
+int main(int argc, char **argv)
+{
+	if (argc == 2)
+	{
+		pFile = fopen(argv[1], "r");
+		if (pFile == NULL)
+			perror("Error opening file");
+	}
+	else
+	{
+		std::cout << "Usage: ./code InputFile\n";
+		return 1;
+	}
+
+	// initialize line number and column numbers to zero
+	lineNo = 1;
+	columnNo = 1;
+
+	/**
+	 * Lexter that doesn't need to be ran  
+	 */
+	// get the first token
+	// getNextToken();
+	// while (CurTok.type != EOF_TOK) {
+	// 	fprintf(stderr, "Token: %s with type %d\n", CurTok.lexeme.c_str(),
+	// 					CurTok.type);
+	// 	getNextToken();
+	// }
+	// fprintf(stderr, "Lexer Finished\n");
+
+	// Make the module, which holds all the code.
+	TheModule = std::make_unique<Module>("mini-c", TheContext);
+
+	// Run the parser now.
+	parser();
+	fprintf(stderr, "Parsing Finished\n");
+
+	try
+	{
+		root->codegen();
+	}
+	catch (const std::exception &e)
+	{
+		std::cout << e.what() << std::endl;
+		exit(1);
+	}
+
+	//********************* Start printing final IR **************************
+	// Print out all of the generated code into a file called output.ll
+	auto Filename = "output.ll";
+	std::error_code EC;
+	raw_fd_ostream dest(Filename, EC, sys::fs::OF_None);
+
+	if (EC)
+	{
+		errs() << "Could not open file: " << EC.message();
+		return 1;
+	}
+
+
+	if (TERMINAL_IR)
+	{
+		TheModule->print(errs(), nullptr); // print IR to terminal#
+	}
+
+	if (WARNINGS)
+	{
+		/**
+		 * Output any compiler warnings that didn't result in a crash, but may result in undesierable behaivour.
+		 */
+		if (Warnings.size() != 0)
+		{
+			std::cout << "Warnings: " << std::endl;
+			int warningCnt = 0;
+			for (auto &Warn : Warnings)
+			{
+				std::cout << std::to_string(++warningCnt) << ". " << Warn.to_string() << std::endl;
+			}
+		}
+	}
+
+	TheModule->print(dest, nullptr);
+	//********************* End printing final IR ****************************
+
+	fclose(pFile); // close the file that contains the code that was parsed
+	return 0;
+}
