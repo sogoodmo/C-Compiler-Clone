@@ -45,6 +45,12 @@ static LLVMContext TheContext;
 static IRBuilder<> Builder(TheContext);
 static std::unique_ptr<Module> TheModule;
 
+// Global variables to be turned on and off at the markers will
+static bool PRINT_AST = false;
+static bool TERMINAL_IR = true;
+static bool WARNINGS = true; 
+
+
 static std::string filename; 
 static std::ifstream filereader; 
 
@@ -60,7 +66,6 @@ static std::unordered_map<std::string, llvm::GlobalVariable *> GlobalVariables;
 static std::unordered_set<std::string> UndefinedVars;
 
 static bool IfPathsReturn = false; 
-static bool IfStmtLast = false; 
 
 std::string underline_str(std::string str)
 {
@@ -1251,8 +1256,6 @@ public:
 				throw SemanticException("Incorrect Function Return Type. Expected: " + llvmTypeToStr(FuncReturnType) + " Got: " + llvmTypeToStr(RetValue->getType()), returnTok.lineNo, returnTok.columnNo);
 			}
 
-			std::cout << llvmTypeToStr(RetValue->getType()) << std::endl;
-
 			Builder.CreateRet(RetValue);
 		}
 		else
@@ -2036,7 +2039,6 @@ public:
 		std::vector<llvm::Type *> Args;
 		
 		bool FuncContainsReturn = false; 
-		IfStmtLast = false;
 
 		Function *ExternFuncDef = TheModule->getFunction(Ident.lexeme);
 		
@@ -3794,10 +3796,6 @@ static std::unique_ptr<ProgramAST> Program()
 #pragma endregion
 
 
-// Global variables to be turned on and off at the markers will
-static bool PRINT_AST = false;
-static bool TERMINAL_IR = true;
-static bool WARNINGS = true; 
 
 
 
@@ -3835,10 +3833,6 @@ static void parser()
 		exit(1);
 	}
 }
-
-//===----------------------------------------------------------------------===//
-// Code Generation
-//===----------------------------------------------------------------------===//
 
 //===----------------------------------------------------------------------===//
 // Main driver code.
