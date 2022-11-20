@@ -1,5 +1,13 @@
 #include "lexer.hpp"
 
+std::string IdentifierStr; // Filled in if IDENT
+int IntVal;				  // Filled in if INT_LIT
+bool BoolVal;			  // Filled in if BOOL_LIT
+float FloatVal;			  // Filled in if FLOAT_LIT
+std::string StringVal;	  // Filled in if String Literal
+int lineNo, columnNo;
+FILE *pFile;
+
 TOKEN returnTok(std::string lexVal, int tok_type)
 {
 	TOKEN return_tok;

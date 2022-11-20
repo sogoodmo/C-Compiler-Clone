@@ -1,15 +1,12 @@
-
 #include "parser.hpp"
 
-// #include "parser_helper.cpp" //Contains common 
+TOKEN CurTok;
+std::deque<TOKEN> tok_buffer;
 
-//===----------------------------------------------------------------------===//
-// Recursive Descent Parser - Function call for each production
-//===----------------------------------------------------------------------===//
-
+#pragma region
 
 // arg_list_prime ::= "," expr arg_list_prime | epsilon
-static void Arg_List_Prime(std::vector<std::unique_ptr<ExprAST>> &args)
+void Arg_List_Prime(std::vector<std::unique_ptr<ExprAST>> &args)
 {
 	if (CurTok.type == RPAR)
 	{
@@ -18,7 +15,7 @@ static void Arg_List_Prime(std::vector<std::unique_ptr<ExprAST>> &args)
 
 	if (CurTok.type == COMMA)
 	{
-		Match(TOKEN_TYPE::COMMA, "Expected ',' after argument");
+		Match(COMMA, "Expected: ',' after argument");
 		auto arg = Expr();
 		args.push_back(std::move(arg));
 
@@ -26,12 +23,12 @@ static void Arg_List_Prime(std::vector<std::unique_ptr<ExprAST>> &args)
 	}
 	else
 	{
-		throw ParseException("Invalid Token Error: \nExpected: End of Function Call or New Argument. ");
+		throw ParseException("Expected: End of Function Call or New Argument.", CurTok.lineNo, CurTok.columnNo);
 	}
 }
 
 // arg_list ::= expr arg_list_prime
-static std::vector<std::unique_ptr<ExprAST>> Arg_List()
+std::vector<std::unique_ptr<ExprAST>> Arg_List()
 {
 	std::vector<std::unique_ptr<ExprAST>> args;
 
@@ -44,14 +41,14 @@ static std::vector<std::unique_ptr<ExprAST>> Arg_List()
 	}
 	else
 	{
-		throw ParseException("Invalid Token Error: \nExpected: Function Argument. ");
+		throw ParseException("Expected: Function Argument.", CurTok.lineNo, CurTok.columnNo);
 	}
 
 	return args;
 }
 
 // args ::= arg_list |  epsilon
-static std::vector<std::unique_ptr<ExprAST>> Args()
+std::vector<std::unique_ptr<ExprAST>> Args()
 {
 	std::vector<std::unique_ptr<ExprAST>> args;
 
@@ -61,14 +58,14 @@ static std::vector<std::unique_ptr<ExprAST>> Args()
 	}
 	else if (CurTok.type != RPAR)
 	{
-		throw ParseException("Invalid Token Error: \nExpected: Function Argument or End of Function Call. ");
+		throw ParseException("Expected: Function Argument or End of Function Call.", CurTok.lineNo, CurTok.columnNo);
 	}
 
 	return args;
 }
 
 // rval_term ::= INT_LIT | FLOAT_LIT | BOOL_LIT
-static std::unique_ptr<ExprAST> Rval_Term()
+std::unique_ptr<ExprAST> Rval_Term()
 {
 	std::unique_ptr<ExprAST> expr;
 	TOKEN lit_tok = CurTok;
@@ -77,34 +74,34 @@ static std::unique_ptr<ExprAST> Rval_Term()
 	{
 	case BOOL_LIT:
 	{
-		Match(TOKEN_TYPE::BOOL_LIT, "Expected bool literal. ");
+		Match(BOOL_LIT, "Expected: bool literal.");
 
 		expr = std::make_unique<BoolAST>(std::move(lit_tok));
 		break;
 	}
 	case FLOAT_LIT:
 	{
-		Match(TOKEN_TYPE::FLOAT_LIT, "Expected float literal. ");
+		Match(FLOAT_LIT, "Expected: float literal.");
 
 		expr = std::make_unique<FloatAST>(std::move(lit_tok));
 		break;
 	}
 	case INT_LIT:
 	{
-		Match(TOKEN_TYPE::INT_LIT, "Expected int literal. ");
+		Match(INT_LIT, "Expected: int literal.");
 
 		expr = std::make_unique<IntegerAST>(std::move(lit_tok));
 		break;
 	}
 	default:
-		throw ParseException("Invalid Token Error: \nExpected: Literal. ");
+		throw ParseException("Expected: Literal.", CurTok.lineNo, CurTok.columnNo);
 	}
 
 	return expr;
 }
 
 // rval_ident_prime ::= epsilon | "(" args ")"
-static std::unique_ptr<ExprAST> Rval_Ident_Prime(TOKEN ident)
+std::unique_ptr<ExprAST> Rval_Ident_Prime(TOKEN ident)
 {
 	std::vector<std::unique_ptr<ExprAST>> args;
 	std::unique_ptr<ExprAST> expr;
@@ -127,26 +124,26 @@ static std::unique_ptr<ExprAST> Rval_Ident_Prime(TOKEN ident)
 	case DIV:
 	case ASTERIX:
 	case MINUS:
-		expr = std::make_unique<Variable>(std::move(ident));
+		expr = std::make_unique<VariableAST>(std::move(ident));
 		break;
 	case LPAR:
 	{
-		Match(TOKEN_TYPE::LPAR, "Expected '(' before function call. ");
+		Match(LPAR, "Expected: '(' before function call.");
 		args = Args();
-		Match(TOKEN_TYPE::RPAR, "Expected ')' after function call. ");
+		Match(RPAR, "Expected: ')' after function call.");
 
 		expr = std::make_unique<FuncCallAST>(std::move(ident), std::move(args));
 		break;
 	}
 	default:
-		throw ParseException("Invalid Token Error: \nExpected: One Of [',' New Argument, ')' End of Arguments, ';' End of Expression] or Operation. ");
+		throw ParseException("Expected: One Of [',' New Argument, ')' End of Arguments, ';' End of Expression] or Operation.", CurTok.lineNo, CurTok.columnNo);
 	}
 
 	return expr;
 }
 
 // rval_ident ::= IDENT rval_ident_prime | rval_term
-static std::unique_ptr<ExprAST> Rval_Ident()
+std::unique_ptr<ExprAST> Rval_Ident()
 {
 	std::unique_ptr<ExprAST> expr;
 
@@ -162,14 +159,14 @@ static std::unique_ptr<ExprAST> Rval_Ident()
 	}
 	else
 	{
-		throw ParseException("Invalid Token Error: \nExpected: Variable, Literal or Function Call. ");
+		throw ParseException("Expected: Variable, Literal or Function Call.", CurTok.lineNo, CurTok.columnNo);
 	}
 
 	return expr;
 }
 
 // rval_par ::= "(" expr ")" | rval_ident
-static std::unique_ptr<ExprAST> Rval_Par()
+std::unique_ptr<ExprAST> Rval_Par()
 {
 	std::unique_ptr<ExprAST> expr;
 	switch (CurTok.type)
@@ -184,20 +181,20 @@ static std::unique_ptr<ExprAST> Rval_Par()
 	}
 	case LPAR:
 	{
-		Match(TOKEN_TYPE::LPAR, "Expected '(' before expression. ");
+		Match(LPAR, "Expected: '(' before expression.");
 		expr = Expr();
-		Match(TOKEN_TYPE::RPAR, "Expected ')' after expression. ");
+		Match(RPAR, "Expected: ')' after expression.");
 		break;
 	}
 	default:
-		throw ParseException("Invalid Token Error: \nExpected: Start of Expression. ");
+		throw ParseException("Expected: Start of Expression.", CurTok.lineNo, CurTok.columnNo);
 	}
 
 	return expr;
 }
 
 // rval_neg ::= "-" rval_neg | "!" rval_neg | rval_par
-static std::unique_ptr<ExprAST> Rval_Neg()
+std::unique_ptr<ExprAST> Rval_Neg()
 {
 	std::unique_ptr<ExprAST> unary_expr;
 	TOKEN Op_Token = CurTok;
@@ -215,7 +212,7 @@ static std::unique_ptr<ExprAST> Rval_Neg()
 	}
 	case NOT:
 	{
-		Match(TOKEN_TYPE::NOT, "Expected '!' operator. ");
+		Match(NOT, "Expected: '!' operator.");
 
 		auto expr = Rval_Neg();
 
@@ -224,7 +221,7 @@ static std::unique_ptr<ExprAST> Rval_Neg()
 	}
 	case MINUS:
 	{
-		Match(TOKEN_TYPE::MINUS, "Expected '-' operator. ");
+		Match(MINUS, "Expected: '-' operator.");
 
 		auto expr = Rval_Neg();
 
@@ -232,14 +229,14 @@ static std::unique_ptr<ExprAST> Rval_Neg()
 		break;
 	}
 	default:
-		throw ParseException("Invalid Token Error: \nExpected: Start of Expression. ");
+		throw ParseException("Expected: Start of Expression.", CurTok.lineNo, CurTok.columnNo);
 	}
 
 	return unary_expr;
 }
 
 // rval_mul_prime ::= "*" rval_neg  | "/" rval_neg  | "%" rval_neg | epsilon
-static std::unique_ptr<ExprAST> Rval_Mul_Prime(std::unique_ptr<ExprAST> LHS)
+std::unique_ptr<ExprAST> Rval_Mul_Prime(std::unique_ptr<ExprAST> LHS)
 {
 	// cout << "Rval_Mul_Prime" << endl;
 	std::unique_ptr<ExprAST> LHS_Prime;
@@ -266,7 +263,7 @@ static std::unique_ptr<ExprAST> Rval_Mul_Prime(std::unique_ptr<ExprAST> LHS)
 		break;
 	case MOD:
 	{
-		Match(TOKEN_TYPE::MOD, "Expected '%' operator. ");
+		Match(MOD, "Expected: '%' operator.");
 
 		LHS_Prime = Rval_Neg();
 		RHS = Rval_Mul_Prime(std::move(LHS));
@@ -276,7 +273,7 @@ static std::unique_ptr<ExprAST> Rval_Mul_Prime(std::unique_ptr<ExprAST> LHS)
 	}
 	case DIV:
 	{
-		Match(TOKEN_TYPE::DIV, "Expected '/' operator. ");
+		Match(DIV, "Expected: '/' operator.");
 
 		LHS_Prime = Rval_Neg();
 		RHS = Rval_Mul_Prime(std::move(LHS));
@@ -286,7 +283,7 @@ static std::unique_ptr<ExprAST> Rval_Mul_Prime(std::unique_ptr<ExprAST> LHS)
 	}
 	case ASTERIX:
 	{
-		Match(TOKEN_TYPE::ASTERIX, "Expected '*' operator. ");
+		Match(ASTERIX, "Expected: '*' operator.");
 
 		LHS_Prime = Rval_Neg();
 		RHS = Rval_Mul_Prime(std::move(LHS));
@@ -295,18 +292,17 @@ static std::unique_ptr<ExprAST> Rval_Mul_Prime(std::unique_ptr<ExprAST> LHS)
 		break;
 	}
 	default:
-		throw ParseException("Invalid Token Error: \nExpected: One Of [',' New Argument, ')' End of Arguments, ';' End of Expression] or Operation. ");
+		throw ParseException("Expected: One Of [',' New Argument, ')' End of Arguments, ';' End of Expression] or Operation.", CurTok.lineNo, CurTok.columnNo);
 	}
 	return expr;
 }
 
 // rval_mul ::= rval_neg rval_mul_prime
-static std::unique_ptr<ExprAST> Rval_Mul()
+std::unique_ptr<ExprAST> Rval_Mul()
 {
 	std::unique_ptr<ExprAST> LHS = Rval_Neg();
 
-	while (CurTok.type == ASTERIX || CurTok.type == MOD || CurTok.type == DIV)
-	{
+	while (CurTok.type == ASTERIX || CurTok.type == MOD || CurTok.type == DIV){
 		TOKEN op = CurTok;
 		getNextToken();
 
@@ -314,12 +310,12 @@ static std::unique_ptr<ExprAST> Rval_Mul()
 
 		LHS = std::make_unique<BinaryExprAST>(op, std::move(LHS), std::move(RHS));
 	}
-
+	
 	return Rval_Mul_Prime(std::move(LHS));
 }
 
 // rval_add_prime ::= "+" rval_mul  | "-" rval_mul | epsilon
-static std::unique_ptr<ExprAST> Rval_Add_Prime(std::unique_ptr<ExprAST> LHS)
+std::unique_ptr<ExprAST> Rval_Add_Prime(std::unique_ptr<ExprAST> LHS)
 {
 	// cout << "Rval_Add_Prime" << endl;
 	std::unique_ptr<ExprAST> LHS_Prime;
@@ -344,7 +340,7 @@ static std::unique_ptr<ExprAST> Rval_Add_Prime(std::unique_ptr<ExprAST> LHS)
 		break;
 	case PLUS:
 	{
-		Match(TOKEN_TYPE::PLUS, "Expected '+' operator. ");
+		Match(PLUS, "Expected: '+' operator.");
 
 		LHS_Prime = Rval_Mul();
 		RHS = Rval_Add_Prime(std::move(LHS));
@@ -354,7 +350,7 @@ static std::unique_ptr<ExprAST> Rval_Add_Prime(std::unique_ptr<ExprAST> LHS)
 	}
 	case MINUS:
 	{
-		Match(TOKEN_TYPE::MINUS, "Expected '-' operator. ");
+		Match(MINUS, "Expected: '-' operator.");
 
 		LHS_Prime = Rval_Mul();
 		RHS = Rval_Add_Prime(std::move(LHS));
@@ -363,18 +359,17 @@ static std::unique_ptr<ExprAST> Rval_Add_Prime(std::unique_ptr<ExprAST> LHS)
 		break;
 	}
 	default:
-		throw ParseException("Invalid Token Error: \nExpected: One Of [',' New Argument, ')' End of Arguments, ';' End of Expression] or Operation. ");
+		throw ParseException("Expected: One Of [',' New Argument, ')' End of Arguments, ';' End of Expression] or Operation.", CurTok.lineNo, CurTok.columnNo);
 	}
 	return expr;
 }
 
 // rval_add ::= rval_mul rval_add_prime
-static std::unique_ptr<ExprAST> Rval_Add()
+std::unique_ptr<ExprAST> Rval_Add()
 {
 	std::unique_ptr<ExprAST> LHS = Rval_Mul();
-
-	while (CurTok.type == PLUS || CurTok.type == MINUS)
-	{
+	
+	while (CurTok.type == PLUS || CurTok.type == MINUS){
 		TOKEN op = CurTok;
 		getNextToken();
 
@@ -387,7 +382,7 @@ static std::unique_ptr<ExprAST> Rval_Add()
 }
 
 // rval_cmp_prime ::= "<=" rval_add | "<" rval_add | ">=" rval_add | ">" rval_add | epsilon
-static std::unique_ptr<ExprAST> Rval_Cmp_Prime(std::unique_ptr<ExprAST> LHS)
+std::unique_ptr<ExprAST> Rval_Cmp_Prime(std::unique_ptr<ExprAST> LHS)
 {
 	std::unique_ptr<ExprAST> LHS_Prime;
 	std::unique_ptr<ExprAST> RHS;
@@ -407,7 +402,7 @@ static std::unique_ptr<ExprAST> Rval_Cmp_Prime(std::unique_ptr<ExprAST> LHS)
 		break;
 	case LT:
 	{
-		Match(TOKEN_TYPE::LT, "Expected '<' operator. ");
+		Match(LT, "Expected: '<' operator.");
 
 		LHS_Prime = Rval_Add();
 		RHS = Rval_Cmp_Prime(std::move(LHS));
@@ -417,7 +412,7 @@ static std::unique_ptr<ExprAST> Rval_Cmp_Prime(std::unique_ptr<ExprAST> LHS)
 	}
 	case GT:
 	{
-		Match(TOKEN_TYPE::GT, "Expected '>' operator. ");
+		Match(GT, "Expected: '>' operator.");
 
 		LHS_Prime = Rval_Add();
 		RHS = Rval_Cmp_Prime(std::move(LHS));
@@ -427,7 +422,7 @@ static std::unique_ptr<ExprAST> Rval_Cmp_Prime(std::unique_ptr<ExprAST> LHS)
 	}
 	case LE:
 	{
-		Match(TOKEN_TYPE::LE, "Expected '<=' operator. ");
+		Match(LE, "Expected: '<=' operator.");
 
 		LHS_Prime = Rval_Add();
 		RHS = Rval_Cmp_Prime(std::move(LHS));
@@ -437,7 +432,7 @@ static std::unique_ptr<ExprAST> Rval_Cmp_Prime(std::unique_ptr<ExprAST> LHS)
 	}
 	case GE:
 	{
-		Match(TOKEN_TYPE::GE, "Exepcted '>=' operator. ");
+		Match(GE, "Exepcted: '>=' operator.");
 
 		LHS_Prime = Rval_Add();
 		RHS = Rval_Cmp_Prime(std::move(LHS));
@@ -446,18 +441,17 @@ static std::unique_ptr<ExprAST> Rval_Cmp_Prime(std::unique_ptr<ExprAST> LHS)
 		break;
 	}
 	default:
-		throw ParseException("Invalid Token Error: \nExpected: One Of [',' New Argument, ')' End of Arguments, ';' End of Expression] or Operation. ");
+		throw ParseException("Expected: One Of [',' New Argument, ')' End of Arguments, ';' End of Expression] or Operation.", CurTok.lineNo, CurTok.columnNo);
 	}
 	return expr;
 }
 
 // rval_cmp ::= rval_add rval_cmp_prime
-static std::unique_ptr<ExprAST> Rval_Cmp()
+std::unique_ptr<ExprAST> Rval_Cmp()
 {
 	std::unique_ptr<ExprAST> LHS = Rval_Add();
-
-	while (CurTok.type == LT || CurTok.type == LE || CurTok.type == GT || CurTok.type == GE)
-	{
+	
+	while (CurTok.type == LT || CurTok.type == LE || CurTok.type == GT || CurTok.type == GE){
 		TOKEN op = CurTok;
 		getNextToken();
 
@@ -470,7 +464,7 @@ static std::unique_ptr<ExprAST> Rval_Cmp()
 }
 
 // rval_eq_prime ::= "==" rval_cmp | "!=" rval_cmp | epsilon
-static std::unique_ptr<ExprAST> Rval_Eq_Prime(std::unique_ptr<ExprAST> LHS)
+std::unique_ptr<ExprAST> Rval_Eq_Prime(std::unique_ptr<ExprAST> LHS)
 {
 	std::unique_ptr<ExprAST> LHS_Prime;
 	std::unique_ptr<ExprAST> RHS;
@@ -488,7 +482,7 @@ static std::unique_ptr<ExprAST> Rval_Eq_Prime(std::unique_ptr<ExprAST> LHS)
 		break;
 	case EQ:
 	{
-		Match(TOKEN_TYPE::EQ, "Expected '==' operator. ");
+		Match(EQ, "Expected: '==' operator.");
 
 		LHS_Prime = Rval_Cmp();
 		RHS = Rval_Eq_Prime(std::move(LHS));
@@ -498,7 +492,7 @@ static std::unique_ptr<ExprAST> Rval_Eq_Prime(std::unique_ptr<ExprAST> LHS)
 	}
 	case NE:
 	{
-		Match(TOKEN_TYPE::NE, "Expected '!=' operator. ");
+		Match(NE, "Expected:'!=' operator.");
 
 		LHS_Prime = Rval_Cmp();
 		RHS = Rval_Eq_Prime(std::move(LHS));
@@ -507,19 +501,18 @@ static std::unique_ptr<ExprAST> Rval_Eq_Prime(std::unique_ptr<ExprAST> LHS)
 		break;
 	}
 	default:
-		throw ParseException("Invalid Token Error: \nExpected: One Of [',' New Argument, ')' End of Arguments, ';' End of Expression] or Operation. ");
+		throw ParseException("Expected: One Of [',' New Argument, ')' End of Arguments, ';' End of Expression] or Operation.", CurTok.lineNo, CurTok.columnNo);
 	}
 
 	return expr;
 }
 
 // rval_eq ::= rval_cmp rval_eq_prime
-static std::unique_ptr<ExprAST> Rval_Eq()
+std::unique_ptr<ExprAST> Rval_Eq()
 {
 	std::unique_ptr<ExprAST> LHS = Rval_Cmp();
-
-	while (CurTok.type == EQ || CurTok.type == NE)
-	{
+	
+	while (CurTok.type == EQ || CurTok.type == NE){
 		TOKEN op = CurTok;
 		getNextToken();
 
@@ -532,7 +525,7 @@ static std::unique_ptr<ExprAST> Rval_Eq()
 }
 
 // rval_and_prime ::= "&&" rval_eq rval_and_prime | epsilon
-static std::unique_ptr<ExprAST> Rval_And_Prime(std::unique_ptr<ExprAST> LHS)
+std::unique_ptr<ExprAST> Rval_And_Prime(std::unique_ptr<ExprAST> LHS)
 {
 	std::unique_ptr<ExprAST> LHS_Prime;
 	std::unique_ptr<ExprAST> RHS;
@@ -549,28 +542,27 @@ static std::unique_ptr<ExprAST> Rval_And_Prime(std::unique_ptr<ExprAST> LHS)
 		break;
 	case AND:
 	{
-		Match(TOKEN_TYPE::AND, "Expected '&&' operator. ");
+		Match(AND, "Expected: '&&' operator.");
 
 		LHS_Prime = Rval_Eq();
 		RHS = Rval_And_Prime(std::move(LHS));
 
 		expr = std::make_unique<BinaryExprAST>(std::move(Op_Token), std::move(LHS_Prime), std::move(RHS));
-
+		
 		break;
 	}
 	default:
-		throw ParseException("Invalid Token Error: \nExpected: One Of [',' New Argument, ')' End of Arguments, ';' End of Expression] or Operation. ");
+		throw ParseException("Expected: One Of [',' New Argument, ')' End of Arguments, ';' End of Expression] or Operation.", CurTok.lineNo, CurTok.columnNo);
 	}
 	return expr;
 }
 
 // rval_and ::= rval_eq rval_and_prime
-static std::unique_ptr<ExprAST> Rval_And()
+std::unique_ptr<ExprAST> Rval_And()
 {
 	std::unique_ptr<ExprAST> LHS = Rval_Eq();
 
-	while (CurTok.type == AND)
-	{
+	while (CurTok.type == AND){
 		TOKEN op = CurTok;
 		getNextToken();
 
@@ -578,12 +570,12 @@ static std::unique_ptr<ExprAST> Rval_And()
 
 		LHS = std::make_unique<BinaryExprAST>(op, std::move(LHS), std::move(RHS));
 	}
-
+	
 	return Rval_And_Prime(std::move(LHS));
 }
 
 // rval_or_prime ::= "||" rval_and rval_or_prime | epsilon
-static std::unique_ptr<ExprAST> Rval_Or_Prime(std::unique_ptr<ExprAST> LHS)
+std::unique_ptr<ExprAST> Rval_Or_Prime(std::unique_ptr<ExprAST> LHS)
 {
 	std::unique_ptr<ExprAST> LHS_Prime;
 	std::unique_ptr<ExprAST> RHS;
@@ -599,7 +591,7 @@ static std::unique_ptr<ExprAST> Rval_Or_Prime(std::unique_ptr<ExprAST> LHS)
 		break;
 	case OR:
 	{
-		Match(TOKEN_TYPE::OR, "Expected '||' operator. ");
+		Match(OR, "Expected: '||' operator.");
 
 		LHS_Prime = Rval_And();
 		RHS = Rval_Or_Prime(std::move(LHS));
@@ -608,19 +600,18 @@ static std::unique_ptr<ExprAST> Rval_Or_Prime(std::unique_ptr<ExprAST> LHS)
 		break;
 	}
 	default:
-		throw ParseException("Invalid Token Error: \nExpected: One Of [',' New Argument, ')' End of Arguments, ';' End of Expression] or Operation. ");
+		throw ParseException("Expected: One Of [',' New Argument, ')' End of Arguments, ';' End of Expression] or Operation.", CurTok.lineNo, CurTok.columnNo);
 	}
 
 	return expr;
 }
 
 // rval_or ::= rval_and rval_or_prime
-static std::unique_ptr<ExprAST> Rval_Or()
+std::unique_ptr<ExprAST> Rval_Or()
 {
 	std::unique_ptr<ExprAST> LHS = Rval_And();
-
-	while (CurTok.type == OR)
-	{
+	
+	while (CurTok.type == OR){
 		TOKEN op = CurTok;
 		getNextToken();
 
@@ -633,7 +624,7 @@ static std::unique_ptr<ExprAST> Rval_Or()
 }
 
 // expr ::= IDENT "=" expr | rval_or
-static std::unique_ptr<ExprAST> Expr()
+std::unique_ptr<ExprAST> Expr()
 {
 	std::unique_ptr<ExprAST> expr;
 
@@ -659,7 +650,7 @@ static std::unique_ptr<ExprAST> Expr()
 		{
 			TOKEN ident = GetIdentAndMatch();
 
-			Match(TOKEN_TYPE::ASSIGN, "Expected '=' after variable identifer. ");
+			Match(ASSIGN, "Expected: '=' after variable identifer.");
 
 			auto var_expr = Expr();
 
@@ -674,60 +665,60 @@ static std::unique_ptr<ExprAST> Expr()
 	}
 	case SC:
 	{
-		Match(TOKEN_TYPE::SC, "Expected ';'. ");
+		Match(SC, "Expected: ';'.");
 		break;
 	}
 	default:
-		throw ParseException("Invalid Token Error: \nExpected: Expected Assignment or Start of Expression. ");
+		throw ParseException("Expected: Assignment or Start of Expression.", CurTok.lineNo, CurTok.columnNo);
 	}
 	return expr;
 }
 
 // return_stmt_prime ::= ";" | expr ";"
-static std::unique_ptr<ReturnAST> Return_Stmt_Prime()
+std::unique_ptr<ReturnAST> Return_Stmt_Prime()
 {
 	std::unique_ptr<ExprAST> expr;
-	TOKEN returnTok;
+	TOKEN returnTok; 
 	if (ValidExprStart())
 	{
 		expr = Expr();
 
 		returnTok = CurTok;
-		Match(TOKEN_TYPE::SC, "Expected ';' after return expression. ");
+		Match(SC, "Expected: ';' after return expression.");
 	}
 	else if (CurTok.type == SC)
 	{
 		returnTok = CurTok;
-		Match(TOKEN_TYPE::SC, "Expected ';' after return keyword. ");
+		Match(SC, "Expected: ';' after return keyword.");
 	}
 	else
 	{
-		throw ParseException("Invalid Token Error: \nExpected: Start of expression. ");
+		throw ParseException("Expected: Start of expression.", CurTok.lineNo, CurTok.columnNo);
 	}
 
 	return std::make_unique<ReturnAST>(std::move(expr), std::move(returnTok));
 }
 
 // return_stmt ::= "return" return_stmt_prime
-static std::unique_ptr<ReturnAST> Return_Stmt()
+std::unique_ptr<ReturnAST> Return_Stmt()
 {
 	std::unique_ptr<ReturnAST> return_stmt;
 
 	if (CurTok.type == RETURN)
 	{
-		Match(TOKEN_TYPE::RETURN, "Expected 'return' keyword. ");
+		Match(RETURN, "Expected: 'return' keyword.");
 		return_stmt = Return_Stmt_Prime();
 	}
 	else
 	{
-		throw ParseException("Invalid Token Error: \nExpected: {RETURN}");
+		throw ParseException("Expected: 'return' keyword.", CurTok.lineNo, CurTok.columnNo);
 	}
 
 	return return_stmt;
 }
 
 // else_stmt  ::= "else" block | epsilon
-static std::unique_ptr<BlockAST> Else_Stmt()
+std::unique_ptr<BlockAST> Else_Stmt()
 {
 	std::unique_ptr<BlockAST> else_block;
 
@@ -749,19 +740,19 @@ static std::unique_ptr<BlockAST> Else_Stmt()
 		break;
 	case ELSE:
 	{
-		Match(TOKEN_TYPE::ELSE, "Expected 'else' keyword after if statement. ");
+		Match(ELSE, "Expected: 'else' keyword after if statement.");
 		else_block = Block();
 		break;
 	}
 	default:
-		throw ParseException("Invalid Token Error: \nExpected: Else block of IF Statment or New Valid Statement ");
+		throw ParseException("Expected: Else block of IF Statment or New Valid Statement.", CurTok.lineNo, CurTok.columnNo);
 	}
 
 	return else_block;
 }
 
 // if_stmt ::= "if" "(" expr ")" block else_stmt
-static std::unique_ptr<IfAST> If_Stmt()
+std::unique_ptr<IfAST> If_Stmt()
 {
 	std::unique_ptr<ExprAST> condition_expr;
 	std::unique_ptr<BlockAST> true_block;
@@ -769,72 +760,72 @@ static std::unique_ptr<IfAST> If_Stmt()
 
 	if (CurTok.type == IF)
 	{
-		Match(TOKEN_TYPE::IF, "Expected 'if' keyword. ");
-		Match(TOKEN_TYPE::LPAR, "Expected '(' before if condition. ");
+		Match(IF, "Expected: 'if' keyword.");
+		Match(LPAR, "Expected: '(' before if condition.");
 
 		condition_expr = Expr();
 
-		Match(TOKEN_TYPE::RPAR, "Expected ')' after if condition. ");
+		Match(RPAR, "Expected: ')' after if condition.");
 
 		true_block = Block();
 		else_block = Else_Stmt();
 	}
 	else
 	{
-		throw ParseException("Invalid Token Error: \nExpected: 'if' keyword. ");
+		throw ParseException("Expected: 'if' keyword.", CurTok.lineNo, CurTok.columnNo);
 	}
 
 	return std::make_unique<IfAST>(std::move(condition_expr), std::move(true_block), std::move(else_block));
 }
 
 // while_stmt ::= "while" "(" expr ")" stmt
-static std::unique_ptr<WhileAST> While_Stmt()
+std::unique_ptr<WhileAST> While_Stmt()
 {
 	std::unique_ptr<ExprAST> condition_expr;
 	std::unique_ptr<StmtAST> loop_block;
 
 	if (CurTok.type == WHILE)
 	{
-		Match(TOKEN_TYPE::WHILE, "Expected 'While' keyword. ");
-		Match(TOKEN_TYPE::LPAR, "Expected '(' before loop condition. ");
+		Match(WHILE, "Expected: 'While' keyword.");
+		Match(LPAR, "Expected: '(' before loop condition.");
 
 		condition_expr = Expr();
 
-		Match(TOKEN_TYPE::RPAR, "Expected ')' after loop condition. ");
+		Match(RPAR, "Expected: ')' after loop condition.");
 
 		loop_block = Stmt();
 	}
 	else
 	{
-		throw ParseException("Invalid Token Error: \nExpected: 'while' keyword. ");
+		throw ParseException("Expected: 'while' keyword.", CurTok.lineNo, CurTok.columnNo);
 	}
 
 	return std::make_unique<WhileAST>(std::move(condition_expr), std::move(loop_block));
 }
 
 // expr_stmt ::= expr ";" | ";"
-static std::unique_ptr<ExprAST> Expr_Stmt()
+std::unique_ptr<ExprAST> Expr_Stmt()
 {
 	std::unique_ptr<ExprAST> expr;
 	if (ValidExprStart())
 	{
 		expr = Expr();
-		Match(TOKEN_TYPE::SC, "Expected ';' after expression. ");
+		Match(SC, "Expected: ';' after expression.");
 	}
 	else if (CurTok.type == SC)
 	{
-		Match(TOKEN_TYPE::SC, "Expected ';' after expression. ");
+		Match(SC, "Expected: ';' after expression.");
 	}
 	else
 	{
-		throw ParseException("Invalid Token Error: \nExpected: Start of expression. ");
+		throw ParseException("Expected: Start of expression.", CurTok.lineNo, CurTok.columnNo);
 	}
 
 	return expr;
 }
 
 // stmt ::= expr_stmt |  block |  if_stmt |  while_stmt |  return_stmt
-static std::unique_ptr<StmtAST> Stmt()
+std::unique_ptr<StmtAST> Stmt()
 {
 	std::unique_ptr<StmtAST> stmt;
 
@@ -860,14 +851,14 @@ static std::unique_ptr<StmtAST> Stmt()
 	}
 	else
 	{
-		throw ParseException("Invalid Token Error: \nExpected: One Of [IfStatment, WhileLoop, ReturnStmt, '{' (Start of New Block), Expression]");
+		throw ParseException("Expected: One Of [IfStatment, WhileLoop, ReturnStmt, '{' (Start of New Block), Expression].", CurTok.lineNo, CurTok.columnNo);
 	}
 
 	return stmt;
 }
 
 // stmt_list ::= stmt stmt_list | epsilon
-static void Stmt_List(std::vector<std::unique_ptr<StmtAST>> &stmt_list)
+void Stmt_List(std::vector<std::unique_ptr<StmtAST>> &stmt_list)
 {
 
 	switch (CurTok.type)
@@ -887,7 +878,7 @@ static void Stmt_List(std::vector<std::unique_ptr<StmtAST>> &stmt_list)
 	{
 		auto stmt = Stmt();
 
-		if (stmt != nullptr)
+		if (stmt)
 		{
 			stmt_list.push_back(std::move(stmt));
 		}
@@ -898,12 +889,12 @@ static void Stmt_List(std::vector<std::unique_ptr<StmtAST>> &stmt_list)
 	case RBRA:
 		break;
 	default:
-		throw ParseException("Invalid Token Error: \nCannot declare variables after a statement. ");
+		throw ParseException("Expected: New Statement, Cannot declare variables after a statement.", CurTok.lineNo, CurTok.columnNo);
 	}
 }
 
 // local_decl ::= var_type IDENT ";"
-static std::unique_ptr<VariableDeclAST> Local_Decl()
+std::unique_ptr<VariableDeclAST> Local_Decl()
 {
 	VAR_TYPE type;
 	TOKEN ident;
@@ -913,18 +904,18 @@ static std::unique_ptr<VariableDeclAST> Local_Decl()
 		type = Var_Type();
 		ident = GetIdentAndMatch();
 
-		Match(TOKEN_TYPE::SC, "Expeceted ';' after variable decleration. ");
+		Match(SC, "Expected ';' after variable decleration.");
 	}
 	else
 	{
-		throw ParseException("Invalid Token Error: \nExpected: Type decleration. ");
+		throw ParseException("Expected: Type decleration.", CurTok.lineNo, CurTok.columnNo);
 	}
 
 	return std::make_unique<VariableDeclAST>(std::move(ident), std::move(type));
 }
 
 // local_decls ::= local_decl local_decls | epsilon
-static void Local_Decls(std::vector<std::unique_ptr<VariableDeclAST>> &variable_decls)
+void Local_Decls(std::vector<std::unique_ptr<VariableDeclAST>> &variable_decls)
 {
 
 	switch (CurTok.type)
@@ -954,35 +945,35 @@ static void Local_Decls(std::vector<std::unique_ptr<VariableDeclAST>> &variable_
 		break;
 	}
 	default:
-		throw ParseException("Invalid Token Error: \nExpected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS, SC, RETURN, IF, WHILE, RBRA, LBRA, BOOL_TOK, FLOAT_TOK, INT_TOK}");
+		throw ParseException("Expected: {BOOL_LIT, FLOAT_LIT, INT_LIT, LPAR, IDENT, NOT, MINUS, SC, RETURN, IF, WHILE, RBRA, LBRA, BOOL_TOK, FLOAT_TOK, INT_TOK}", CurTok.lineNo, CurTok.columnNo);
 	}
 }
 
 // block ::= "{" local_decls stmt_list "}"
-static std::unique_ptr<BlockAST> Block()
+std::unique_ptr<BlockAST> Block()
 {
 	std::vector<std::unique_ptr<VariableDeclAST>> variable_decls;
 	std::vector<std::unique_ptr<StmtAST>> stmt_list;
 
 	if (CurTok.type == LBRA)
 	{
-		Match(TOKEN_TYPE::LBRA, "Expected '{' to declare new scope. ");
+		Match(LBRA, "Expected: '{' to declare new scope.");
 
 		Local_Decls(variable_decls);
 		Stmt_List(stmt_list);
 
-		Match(TOKEN_TYPE::RBRA, "Expected '}' after statement. ");
+		Match(RBRA, "Expected: '}' after statement.");
 	}
 	else
 	{
-		throw ParseException("Invalid Token Error: \nExpected: '{' to declare new scope. ");
+		throw ParseException("Expected: '{' to declare new scope.", CurTok.lineNo, CurTok.columnNo);
 	}
 
 	return std::make_unique<BlockAST>(std::move(variable_decls), std::move(stmt_list));
 }
 
 // param ::= var_type IDENT
-static std::unique_ptr<ParamAST> Param()
+std::unique_ptr<ParamAST> Param()
 {
 	VAR_TYPE type;
 	TOKEN ident;
@@ -994,14 +985,14 @@ static std::unique_ptr<ParamAST> Param()
 	}
 	else
 	{
-		throw ParseException("Invalid Token Error: \nExpected: Parameter type decleration. ");
+		throw ParseException("Expected: Parameter type decleration.", CurTok.lineNo, CurTok.columnNo);
 	}
 
 	return std::make_unique<ParamAST>(std::move(ident), std::move(type));
 }
 
 // param_list_prime ::= "," param param_list_prime | epsilon
-static void Param_List_Prime(std::vector<std::unique_ptr<ParamAST>> &param_list)
+void Param_List_Prime(std::vector<std::unique_ptr<ParamAST>> &param_list)
 {
 	if (CurTok.type == RPAR)
 	{
@@ -1010,7 +1001,7 @@ static void Param_List_Prime(std::vector<std::unique_ptr<ParamAST>> &param_list)
 
 	if (CurTok.type == COMMA)
 	{
-		Match(TOKEN_TYPE::COMMA, "Expected ',' or ')' after function parameter");
+		Match(COMMA, "Expected: ',' or ')' after function parameter");
 		auto param = Param();
 		param_list.push_back(std::move(param));
 
@@ -1018,12 +1009,12 @@ static void Param_List_Prime(std::vector<std::unique_ptr<ParamAST>> &param_list)
 	}
 	else
 	{
-		throw ParseException("Invalid Token Error: \nExpected: ',' or ')' in function paramters");
+		throw ParseException("Expected: ',' or ')' in function paramters.", CurTok.lineNo, CurTok.columnNo);
 	}
 }
 
 // param_list ::= param param_list_prime
-static std::vector<std::unique_ptr<ParamAST>> Param_List()
+std::vector<std::unique_ptr<ParamAST>> Param_List()
 {
 	std::vector<std::unique_ptr<ParamAST>> param_list;
 
@@ -1036,14 +1027,14 @@ static std::vector<std::unique_ptr<ParamAST>> Param_List()
 	}
 	else
 	{
-		throw ParseException("Invalid Token Error: \nExpected: Paramter Type. ");
+		throw ParseException("Expected: Paramter Type.", CurTok.lineNo, CurTok.columnNo);
 	}
 
 	return param_list;
 }
 
 // params ::= param_list |  "void" | epsilon
-static std::vector<std::unique_ptr<ParamAST>> Params()
+std::vector<std::unique_ptr<ParamAST>> Params()
 {
 	std::vector<std::unique_ptr<ParamAST>> param_list;
 
@@ -1054,7 +1045,7 @@ static std::vector<std::unique_ptr<ParamAST>> Params()
 
 	if (CurTok.type == VOID_TOK)
 	{
-		Match(TOKEN_TYPE::VOID_TOK, "Expected 'void' token in function paramters");
+		Match(VOID_TOK, "Expected: 'void' token in function paramters");
 	}
 	else if (ValidType())
 	{
@@ -1062,48 +1053,48 @@ static std::vector<std::unique_ptr<ParamAST>> Params()
 	}
 	else
 	{
-		throw ParseException("Invalid Token Error: \nExpected: End of Paramters or Paramter Type. ");
+		throw ParseException("Expected: End of Paramters or Paramter Type.", CurTok.lineNo, CurTok.columnNo);
 	}
 
 	return param_list;
 }
 
 // var_type  ::= "int" |  "float" |  "bool"
-static VAR_TYPE Var_Type()
+VAR_TYPE Var_Type()
 {
 	VAR_TYPE type;
 
 	if (CurTok.type == BOOL_TOK)
 	{
-		Match(TOKEN_TYPE::BOOL_TOK, "Expected 'bool' keyword.");
+		Match(BOOL_TOK, "Expected: 'bool' keyword.");
 		type = BOOL_TYPE;
 	}
 	else if (CurTok.type == FLOAT_TOK)
 	{
-		Match(TOKEN_TYPE::FLOAT_TOK, "Expected 'float' keyword.");
+		Match(FLOAT_TOK, "Expected: 'float' keyword.");
 		type = FLOAT_TYPE;
 	}
 	else if (CurTok.type == INT_TOK)
 	{
-		Match(TOKEN_TYPE::INT_TOK, "Expected 'int' keyword.");
+		Match(INT_TOK, "Expected: 'int' keyword.");
 		type = INT_TYPE;
 	}
 	else
 	{
-		throw ParseException("Invalid Token Error: \nExpected: Variable type decleration. ");
+		throw ParseException("Expected: Variable type decleration.", CurTok.lineNo, CurTok.columnNo);
 	}
 
 	return type;
 }
 
 // type_spec ::= "void" | var_type
-static VAR_TYPE Type_Spec()
+VAR_TYPE Type_Spec()
 {
 	VAR_TYPE type;
 
 	if (CurTok.type == VOID_TOK)
 	{
-		Match(TOKEN_TYPE::VOID_TOK, "Expected 'void' keyword.");
+		Match(VOID_TOK, "Expected: 'void' keyword.");
 		type = VOID_TYPE;
 	}
 	else if (ValidType())
@@ -1112,23 +1103,23 @@ static VAR_TYPE Type_Spec()
 	}
 	else
 	{
-		throw ParseException("Invalid Token Error: \nExpected: Type decleration. ");
+		throw ParseException("Expected: Type decleration.", CurTok.lineNo, CurTok.columnNo);
 	}
 
 	return type;
 }
 
 // decl_prime ::= ";" | "(" params ")" block
-static void Decl_Prime(std::unique_ptr<FuncDeclAST> &func_decl, std::unique_ptr<VariableDeclAST> &var_decl, VAR_TYPE type, TOKEN ident)
+void Decl_Prime(std::unique_ptr<FuncDeclAST> &func_decl, std::unique_ptr<VariableDeclAST> &var_decl, VAR_TYPE type, TOKEN ident)
 {
 
 	if (CurTok.type == LPAR)
 	{
-		Match(TOKEN_TYPE::LPAR, "Expected '(' after function decleration. ");
+		Match(LPAR, "Expected: '(' after function decleration.");
 
 		auto params = Params();
 
-		Match(TOKEN_TYPE::RPAR, "Expected ')' after function paramters. ");
+		Match(RPAR, "Expected: ')' after function paramters.");
 
 		auto block = Block();
 
@@ -1136,33 +1127,33 @@ static void Decl_Prime(std::unique_ptr<FuncDeclAST> &func_decl, std::unique_ptr<
 	}
 	else if (CurTok.type == SC)
 	{
-		Match(TOKEN_TYPE::SC, "Expected ';' after variable decleration. ");
+		Match(SC, "Expected: ';' after variable decleration.");
 
 		var_decl = std::make_unique<VariableDeclAST>(std::move(ident), std::move(type));
 	}
 	else
 	{
-		throw ParseException("Invalid Token Error: \nExpected: ';' or Function Paramters");
+		throw ParseException("Expected: ';' or Function Paramters.", CurTok.lineNo, CurTok.columnNo);
 	}
 }
 
 // decl ::= var_type IDENT decl_prime | "void" IDENT "(" params ")" block
-static std::unique_ptr<DeclAST> Decl()
+std::unique_ptr<DeclAST> Decl()
 {
 	std::unique_ptr<FuncDeclAST> func_decl;
 	std::unique_ptr<VariableDeclAST> var_decl;
 
 	if (CurTok.type == VOID_TOK)
 	{
-		Match(TOKEN_TYPE::VOID_TOK, "Expected 'void' token before function decleration. ");
+		Match(VOID_TOK, "Expected: 'void' token before function decleration.");
 
 		TOKEN ident = GetIdentAndMatch();
 
-		Match(TOKEN_TYPE::LPAR, "Expeceted '(' after function identifer. ");
+		Match(LPAR, "Expected: '(' after function identifer.");
 
 		auto params = Params();
 
-		Match(TOKEN_TYPE::RPAR, "Expected ')' after parameter list. ");
+		Match(RPAR, "Expected: ')' after parameter list.");
 
 		auto block = Block();
 
@@ -1178,14 +1169,14 @@ static std::unique_ptr<DeclAST> Decl()
 	}
 	else
 	{
-		throw ParseException("Invalid Token Error: \nExpected: Variable or Function type decleration");
+		throw ParseException("Expected: Variable or Function type decleration.", CurTok.lineNo, CurTok.columnNo);
 	}
 
 	return std::make_unique<DeclAST>(std::move(func_decl), std::move(var_decl));
 }
 
 // decl_list_prime ::= decl decl_list_prime | epsilon
-static void Decl_List_Prime(std::vector<std::unique_ptr<DeclAST>> &decl_list)
+void Decl_List_Prime(std::vector<std::unique_ptr<DeclAST>> &decl_list)
 {
 	if (CurTok.type == EOF_TOK)
 	{
@@ -1201,12 +1192,12 @@ static void Decl_List_Prime(std::vector<std::unique_ptr<DeclAST>> &decl_list)
 	}
 	else
 	{
-		throw ParseException("Invalid Token Error: \nExpected: decleration type or end_of_file");
+		throw ParseException("Expected: decleration type or end_of_file.", CurTok.lineNo, CurTok.columnNo);
 	}
 }
 
 // decl_list ::= decl decl_list_prime
-static std::vector<std::unique_ptr<DeclAST>> Decl_List()
+std::vector<std::unique_ptr<DeclAST>> Decl_List()
 {
 	std::vector<std::unique_ptr<DeclAST>> decl_list;
 
@@ -1219,14 +1210,14 @@ static std::vector<std::unique_ptr<DeclAST>> Decl_List()
 	}
 	else
 	{
-		throw ParseException("Invalid Token Error: \nExpected Variable or Function type decleration. ");
+		throw ParseException("Expected: Variable or Function type decleration.", CurTok.lineNo, CurTok.columnNo);
 	}
 
 	return decl_list;
 };
 
 // extern ::= "extern" type_spec IDENT "(" params ")" ";"
-static std::unique_ptr<FuncDeclAST> Extern()
+std::unique_ptr<FuncDeclAST> Extern()
 {
 	TOKEN ident;
 	VAR_TYPE type;
@@ -1235,28 +1226,28 @@ static std::unique_ptr<FuncDeclAST> Extern()
 
 	if (CurTok.type == EXTERN)
 	{
-		Match(TOKEN_TYPE::EXTERN, "EXTERN");
+		Match(EXTERN, "EXTERN");
 
 		type = Type_Spec();
 
 		ident = GetIdentAndMatch();
 
-		Match(TOKEN_TYPE::LPAR, "Expected '(' after identifer keyword.");
+		Match(LPAR, "Expected: '(' after identifer keyword.");
 		params = Params();
-		Match(TOKEN_TYPE::RPAR, "Expected ')' after function paramters.");
+		Match(RPAR, "Expected: ')' after function paramters.");
 
-		Match(TOKEN_TYPE::SC, "Expected ';' after function definition.");
+		Match(SC, "Expected: ';' after function definition.");
 	}
 	else
 	{
-		throw ParseException("Invalid Token Error: \nExpected 'extern' keyword. ");
+		throw ParseException("Expected: 'extern' keyword.", CurTok.lineNo, CurTok.columnNo);
 	}
 
 	return std::make_unique<FuncDeclAST>(std::move(ident), std::move(type), std::move(params), std::move(emptyblock));
 }
 
 // extern_list_prime ::= extern extern_list_prime | epsilon
-static void Extern_List_Prime(std::vector<std::unique_ptr<FuncDeclAST>> &extern_list)
+void Extern_List_Prime(std::vector<std::unique_ptr<FuncDeclAST>> &extern_list)
 {
 
 	if (ValidType() || CurTok.type == VOID_TOK)
@@ -1273,12 +1264,12 @@ static void Extern_List_Prime(std::vector<std::unique_ptr<FuncDeclAST>> &extern_
 	}
 	else
 	{
-		throw ParseException("Invalid Token Error: \nExpected: 'extern' keyword or extern function type. ");
+		throw ParseException("Expected: 'extern' keyword or extern function type.", CurTok.lineNo, CurTok.columnNo);
 	}
 }
 
 // extern_list ::= extern extern_list_prime
-static std::vector<std::unique_ptr<FuncDeclAST>> Extern_List()
+std::vector<std::unique_ptr<FuncDeclAST>> Extern_List()
 {
 	std::vector<std::unique_ptr<FuncDeclAST>> extern_list;
 
@@ -1291,14 +1282,14 @@ static std::vector<std::unique_ptr<FuncDeclAST>> Extern_List()
 	}
 	else
 	{
-		throw ParseException("Invalid Token Error: \nExpected 'extern' Keyword. ");
+		throw ParseException("Expected: 'extern' Keyword.", CurTok.lineNo, CurTok.columnNo);
 	}
 
 	return extern_list;
 };
 
 // program ::= extern_list decl_list | decl_list
-static std::unique_ptr<ProgramAST> Program()
+std::unique_ptr<ProgramAST> Program()
 {
 	std::vector<std::unique_ptr<FuncDeclAST>> extern_list;
 	std::vector<std::unique_ptr<DeclAST>> decl_list;
@@ -1314,8 +1305,10 @@ static std::unique_ptr<ProgramAST> Program()
 	}
 	else
 	{
-		throw ParseException("Invalid Token Error: \nExpected: Extern declerations or Function declerations. ");
+		throw ParseException("Expected: Extern declerations or Function declerations.", CurTok.lineNo, CurTok.columnNo);
 	}
 
 	return std::make_unique<ProgramAST>(std::move(extern_list), std::move(decl_list));
 }
+
+#pragma endregion

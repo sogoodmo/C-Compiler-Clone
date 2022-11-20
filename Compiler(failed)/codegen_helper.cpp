@@ -1,5 +1,4 @@
-#include "codgen_helper.hpp"
-
+#include "codegen_helper.hpp"
 
 /**
  * @brief Get the constant llvm value from a type and value

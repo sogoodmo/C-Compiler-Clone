@@ -30,7 +30,7 @@ void Match(TOKEN_TYPE expectedTokenType, std::string errMessage)
 {
 	if (CurTok.type != expectedTokenType)
 	{
-		throw ParseException("\033[0;31mInvalid Token Error:\033[0m " + errMessage);
+		throw ParseException(errMessage, CurTok.lineNo, CurTok.columnNo);
 	}
 	getNextToken();
 }

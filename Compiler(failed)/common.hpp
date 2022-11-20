@@ -1,15 +1,16 @@
-#include "token.hpp"
-#include "exceptions.hpp"
-
-//common.hpp Common global vars
-
 #ifndef COMMON_H
 #define COMMON_H
 
+#include "token.hpp"
+#include "exceptions.hpp"
+
+
 extern llvm::LLVMContext TheContext;
-extern llvm::IRBuilder<> Builder(TheContext);
+extern llvm::IRBuilder<> Builder;
 extern std::unique_ptr<llvm::Module> TheModule;
 
+extern std::string filename; 
+extern std::ifstream filereader;
 /**
  * Contains a vector of maps- Where the index of the unordered_map indicates it's level of scope
  *

@@ -3796,9 +3796,6 @@ static std::unique_ptr<ProgramAST> Program()
 #pragma endregion
 
 
-
-
-
 static std::unique_ptr<ProgramAST> root;
 
 /**

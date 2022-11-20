@@ -1,10 +1,17 @@
-#include "imports.hpp"
-
 //token.hpp Token info 
 #ifndef TOKEN_H
 #define TOKEN_H
 
-struct TOKEN;
+#include "imports.hpp"
+
+// TOKEN struct is used to keep track of information about a token
+struct TOKEN
+{
+	int type = -100;
+	std::string lexeme;
+	int lineNo;
+	int columnNo;
+};
 
 // The lexer returns one of these for known things.
 enum TOKEN_TYPE

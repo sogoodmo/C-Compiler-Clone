@@ -1,5 +1,4 @@
 #include "ast_helper.hpp"
-#include "codegen_helper.hpp"
 
 /**
  * @brief Converts type enum to string

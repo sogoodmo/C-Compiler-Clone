@@ -1,9 +1,7 @@
-#include "common.hpp"
-
-//ast_helper.hpp Header file for all ast helper functions 
-
 #ifndef AST_HELPER_H
 #define AST_HELPER_H
+
+#include "common.hpp"
 
 const std::string TypeToStr(VAR_TYPE type);
 

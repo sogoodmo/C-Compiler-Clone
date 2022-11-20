@@ -1,11 +1,9 @@
 // parser.hpp
-#include "parser_helper.hpp"
-#include "ast.hpp"
-
-
 #ifndef PARSER_H
 #define PARSER_H
 
+#include "parser_helper.hpp"
+#include "ast.hpp"
 
 
 void Arg_List_Prime(std::vector<std::unique_ptr<ExprAST>> &args);
