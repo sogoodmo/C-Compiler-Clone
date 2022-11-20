@@ -23,10 +23,10 @@ entry:
   %f1 = load float, ptr %f, align 4
   %"!" = fcmp one float %f1, 0.000000e+00
   %finottmp = xor i1 %"!", true
-  %- = zext i1 %finottmp to i32
-  %bminustmp = sub i32 0, %-
+  %bminustmp = sub i1 false, %finottmp
   %i3 = load i32, ptr %i, align 4
-  %addtmp = add i32 %bminustmp, %i3
+  %"+" = zext i1 %bminustmp to i32
+  %addtmp = add i32 %"+", %i3
   %b4 = icmp ne i32 %addtmp, 0
   store i1 %b4, ptr %b, align 1
   br i1 true, label %SkipRExpr, label %RExpr5
