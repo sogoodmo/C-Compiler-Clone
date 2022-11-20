@@ -203,5 +203,5 @@ llvm::Value *ImplicitCasting(llvm::Value *val, llvm::Type *newType, TOKEN tokInf
 		return Builder.CreateIntCast(val, newType, false, tokInfo.lexeme.c_str());
 	}
 
-	throw SemanticException("Unexpected Type. Expected int, bool or float.", tokInfo.lineNo, tokInfo.columnNo);
+	throw SemanticException("Unexpected Type. Expected int, bool or float. Got void.", tokInfo.lineNo, tokInfo.columnNo);
 }

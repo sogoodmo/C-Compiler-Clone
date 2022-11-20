@@ -1,7 +1,7 @@
 #include "make_comp.hpp"
 
 // Global variables to be turned on and off at the markers will
-bool PRINT_AST = false;
+bool PRINT_AST = true;
 bool TERMINAL_IR = true;
 bool WARNINGS = true; 
 
