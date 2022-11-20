@@ -12,7 +12,7 @@ std::string Warning::to_string()
 const char *SemanticException::what() const throw()
 {   
     //Colouring the error 
-    std::string errCode = "\033[0;31m Semantic Error: \033[0m";
+    std::string errCode = "\033[0;31mSemantic Error: \033[0m";
 
     std::string line;
     filereader.open(filename);
@@ -25,7 +25,7 @@ const char *SemanticException::what() const throw()
 
     
     //Generating message to look like code snipped 
-    static std::string errMessage(errCode + " " + Err + "\n\nGot the following: Line: " + std::to_string(lineNo) + "\n\n|\n" + std::to_string(lineNo) + "| " + "\033[0;31m\033[4m" + line + "\033[0m" + "\n|\n");
+    static std::string errMessage(errCode + " " + Err + "\n\nGot the following: Line: " + std::to_string(lineNo) + "\n\n|\n" + std::to_string(lineNo) + "| " + "\033[0;31m" + line + "\033[0m" + "\n|\n");
 
     filereader.close();
     return errMessage.c_str();

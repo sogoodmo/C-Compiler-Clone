@@ -23,7 +23,6 @@ extern std::unordered_map<std::string, llvm::GlobalVariable *> GlobalVariables;
 extern std::unordered_set<std::string> UndefinedVars;
 
 extern bool IfPathsReturn;
-extern bool IfStmtLast;
 
 // Global variable to check if adding a new scope is due to a function, or braces.
 extern bool isFuncBlock;

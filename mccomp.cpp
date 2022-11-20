@@ -1990,7 +1990,7 @@ public:
 			ArgsV.push_back(argExpr);
 		}
 
-		return Builder.CreateCall(CalleeFunc, ArgsV, "calltmp");
+		return Builder.CreateCall(CalleeFunc, ArgsV, "");
 	};
 };
 

@@ -17,7 +17,6 @@ std::unordered_map<std::string, llvm::GlobalVariable *> GlobalVariables;
 std::unordered_set<std::string> UndefinedVars;
 
 bool IfPathsReturn;
-bool IfStmtLast;
 
 // Global variable to check if adding a new scope is due to a function, or braces.
 bool isFuncBlock;
@@ -95,7 +94,6 @@ llvm::Function *FuncDeclAST::codegen()
     std::vector<llvm::Type *> Args;
 
     bool FuncContainsReturn = false;
-    IfStmtLast = false;
 
     llvm::Function *ExternFuncDef = TheModule->getFunction(Ident.lexeme);
 
@@ -179,10 +177,7 @@ llvm::Function *FuncDeclAST::codegen()
      */
     if (IfPathsReturn && !FuncContainsReturn)
     {
-        if (!IfStmtLast)
-        {
-            Warnings.push_back(Warning("\033[0;33mWarning:\033[0m Any code after if-statement may not be reachable in Function: " + Ident.lexeme, Ident.lineNo, Ident.columnNo));
-        }
+        Warnings.push_back(Warning("\033[0;33mWarning:\033[0m Any code after if-statement may not be reachable in Function: " + Ident.lexeme, Ident.lineNo, Ident.columnNo));
 
         if (FuncReturnType->isVoidTy())
         {
@@ -241,7 +236,7 @@ llvm::Value *FuncCallAST::codegen()
         ArgsV.push_back(argExpr);
     }
 
-    return Builder.CreateCall(CalleeFunc, ArgsV, "calltmp");
+    return Builder.CreateCall(CalleeFunc, ArgsV, "");
 };
 
 #pragma endregion
@@ -391,7 +386,7 @@ llvm::Value *VariableAssignmentAST::codegen()
 llvm::Value *BlockAST::codegen()
 {
     bool addScope = !isFuncBlock;
-    llvm::Value *containsReturn;
+    llvm::Value *containsReturn = nullptr;
 
     // If this block is called from a function defintion
     // We must NOT add a layer of scope (As it has already been add for arguments)
@@ -433,15 +428,15 @@ llvm::Value *BlockAST::codegen()
                 Warnings.push_back(Warning("\033[0;33mWarning:\033[0m Return statement will cause it's following lines to not be executed", lineno, colno));
             }
 
-            stmt->codegen();
+            containsReturn = stmt->codegen();
 
             if (addScope)
             {
                 ScopedNamedValues.pop_back();
             }
 
-            // Just returning any non-null value if we're at a return stmt
-            return GetConstant(VAR_TYPE::BOOL_TYPE, 1, false);
+            //Just returning the non-null value from our return stmt 
+            return containsReturn;
         }
         else
         {
@@ -454,7 +449,11 @@ llvm::Value *BlockAST::codegen()
         ScopedNamedValues.pop_back();
     }
 
-    return containsReturn;
+    if (containsReturn && containsReturn->getType()->isIntegerTy(16))
+    {
+        return containsReturn;
+    }
+    return nullptr;
 };
 
 /**
@@ -617,7 +616,8 @@ llvm::Value *ReturnAST::codegen()
         Builder.CreateRetVoid();
     }
 
-    return GetConstant(VAR_TYPE::BOOL_TYPE, 1.0f, false);
+    //Return a 16bit int- to indicate that the stmt is a return stmt 
+    return llvm::ConstantInt::get(TheContext, llvm::APInt(16, 0, true));
 };
 
 #pragma endregion
@@ -662,7 +662,16 @@ llvm::Value *BinaryExprAST::codegen()
     case MOD:
     {
         llvm::Value *LHSVal = LHS->codegen();
+        if (LHSVal->getType()->isVoidTy())
+        {
+            throw SemanticException("Cannot have void type in LHS of expression", Op.lineNo, Op.columnNo);
+        }
+
         llvm::Value *RHSVal = RHS->codegen();
+        if (RHSVal->getType()->isVoidTy())
+        {
+            throw SemanticException("Cannot have void type in RHS of expression", Op.lineNo, Op.columnNo);
+        }
 
         HighestPrecisionType = GetHighestPrecisionType(LHSVal->getType(), RHSVal->getType());
 
@@ -853,6 +862,12 @@ llvm::Value *BinaryExprAST::codegen()
 llvm::Value *UnaryExprAST::codegen()
 {
     llvm::Value *E = Expr->codegen();
+    
+    if (E->getType()->isVoidTy())
+    {
+        throw SemanticException("Cannot use void function call within expression.", Op.lineNo, Op.columnNo);
+    }
+
     llvm::Value *UnaryExpr;
     llvm::Value *CastedValue = E;
     switch (Op.type)
@@ -966,7 +981,14 @@ llvm::Value *CheckLazyAnd(TOKEN Op, std::unique_ptr<ExprAST> LHS, std::unique_pt
 	llvm::BasicBlock *ContBB = llvm::BasicBlock::Create(TheContext, "Cont");
 
 	llvm::Value *BoolRHS;
-	llvm::Value *BoolLHS = ImplicitCasting(LHS->codegen(), TypeToLLVM(BOOL_TYPE, Op), Op, "");
+    llvm::Value *LHSVal = LHS->codegen();
+
+    if (LHSVal->getType()->isVoidTy())
+    {
+        throw SemanticException("Cannot have void type in LHS of expression", Op.lineNo, Op.columnNo);
+    }
+
+	llvm::Value *BoolLHS = ImplicitCasting(LHSVal, TypeToLLVM(BOOL_TYPE, Op), Op, "");
 
 	Builder.CreateCondBr(BoolLHS, RightBB, SkipRightBB);
 
@@ -974,7 +996,15 @@ llvm::Value *CheckLazyAnd(TOKEN Op, std::unique_ptr<ExprAST> LHS, std::unique_pt
 	TheFunction->getBasicBlockList().push_back(RightBB);
 	Builder.SetInsertPoint(RightBB);
 
-	BoolRHS = ImplicitCasting(RHS->codegen(), TypeToLLVM(BOOL_TYPE, Op), Op, "");
+    llvm::Value *RHSVal = RHS->codegen();
+
+    if (RHSVal->getType()->isVoidTy())
+    {
+        throw SemanticException("Cannot have void type in RHS of expression", Op.lineNo, Op.columnNo);
+    }
+
+	BoolRHS = ImplicitCasting(RHSVal, TypeToLLVM(BOOL_TYPE, Op), Op, "");
+
 	Builder.CreateStore(BoolRHS, tmpAlloca);
 
 	Builder.CreateBr(ContBB);
@@ -1022,7 +1052,14 @@ llvm::Value *CheckLazyOr(TOKEN Op, std::unique_ptr<ExprAST> LHS, std::unique_ptr
 	llvm::BasicBlock *ContBB = llvm::BasicBlock::Create(TheContext, "Cont");
 
 	llvm::Value *BoolRHS;
-	llvm::Value *BoolLHS = ImplicitCasting(LHS->codegen(), TypeToLLVM(BOOL_TYPE, Op), Op, "");
+    llvm::Value *LHSVal = LHS->codegen();
+
+    if (LHSVal->getType()->isVoidTy())
+    {
+        throw SemanticException("Cannot have void type in LHS of expression", Op.lineNo, Op.columnNo);
+    }
+
+	llvm::Value *BoolLHS = ImplicitCasting(LHSVal, TypeToLLVM(BOOL_TYPE, Op), Op, "");
 
 	Builder.CreateCondBr(BoolLHS, SkipRightBB, RightBB);
 
@@ -1030,7 +1067,15 @@ llvm::Value *CheckLazyOr(TOKEN Op, std::unique_ptr<ExprAST> LHS, std::unique_ptr
 	TheFunction->getBasicBlockList().push_back(RightBB);
 	Builder.SetInsertPoint(RightBB);
 
-	BoolRHS = ImplicitCasting(RHS->codegen(), TypeToLLVM(BOOL_TYPE, Op), Op, "");
+    llvm::Value *RHSVal = RHS->codegen();
+
+    if (RHSVal->getType()->isVoidTy())
+    {
+        throw SemanticException("Cannot have void type in RHS of expression", Op.lineNo, Op.columnNo);
+    }
+
+	BoolRHS = ImplicitCasting(RHSVal, TypeToLLVM(BOOL_TYPE, Op), Op, "");
+    
 	Builder.CreateStore(BoolRHS, tmpAlloca);
 
 	Builder.CreateBr(ContBB);

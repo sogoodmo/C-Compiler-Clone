@@ -64,7 +64,6 @@ public:
 
 /// =================================== !! Block & Statements Start !! ================================================ ///
 #pragma region
-
 class ReturnAST : public StmtAST
 {
 	std::unique_ptr<ExprAST> ReturnExpr;

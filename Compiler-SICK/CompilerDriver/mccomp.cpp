@@ -2,8 +2,8 @@
 
 // Global variables to be turned on and off at the markers will
 bool PRINT_AST = false;
-bool TERMINAL_IR = false;
-bool WARNINGS = false; 
+bool TERMINAL_IR = true;
+bool WARNINGS = true; 
 
 
 /**
