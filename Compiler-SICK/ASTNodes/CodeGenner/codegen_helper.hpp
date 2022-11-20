@@ -9,7 +9,7 @@ llvm::Type *TypeToLLVM(VAR_TYPE type, TOKEN tokInfo);
 llvm::Type *GetHighestPrecisionType(llvm::Type *t1, llvm::Type *t2);
 const std::string llvmTypeToStr(llvm::Type *type);
 llvm::AllocaInst *CreateEntryBlockAlloca(llvm::Function *TheFunction, const std::string &VarName, llvm::Type *type);
-llvm::Value *GetBool(llvm::Value *val, llvm::Type *type, std::string loopStr);
+llvm::Value *GetBool(llvm::Value *val, llvm::Type *type, std::string loopStr, TOKEN tok);
 llvm::Value *ImplicitCasting(llvm::Value *val, llvm::Type *newType, TOKEN tokInfo, std::string optionalError);
 
 

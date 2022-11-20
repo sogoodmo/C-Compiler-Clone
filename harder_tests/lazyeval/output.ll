@@ -22,8 +22,8 @@ entry:
   br i1 %ieqtmp, label %RExpr3, label %SkipRExpr
 
 RExpr3:                                           ; preds = %entry
-  %calltmp = call i32 @mutating_function()
-  %"&&" = icmp ne i32 %calltmp, 0
+  %0 = call i32 @mutating_function()
+  %"&&" = icmp ne i32 %0, 0
   store i1 %"&&", ptr %tmpLazy, align 1
   br label %Cont
 
@@ -61,8 +61,8 @@ entry:
   br i1 %ieqtmp, label %SkipRExpr, label %RExpr3
 
 RExpr3:                                           ; preds = %entry
-  %calltmp = call i32 @mutating_function()
-  %"||" = icmp ne i32 %calltmp, 0
+  %0 = call i32 @mutating_function()
+  %"||" = icmp ne i32 %0, 0
   store i1 %"||", ptr %tmpLazy, align 1
   br label %Cont
 

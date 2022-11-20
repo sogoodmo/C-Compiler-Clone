@@ -235,7 +235,7 @@ llvm::Value *FuncCallAST::codegen()
 
         ArgsV.push_back(argExpr);
     }
-
+    
     return Builder.CreateCall(CalleeFunc, ArgsV, "");
 };
 
@@ -330,6 +330,10 @@ llvm::Value *VariableDeclAST::codegen()
 llvm::Value *VariableAssignmentAST::codegen()
 {
     llvm::Value *E = Expr->codegen();
+    if (E->getType()->isVoidTy())
+    {
+        throw SemanticException("Cannot have void type in variable assignemnt", Ident.lineNo, Ident.columnNo);
+    }
     llvm::Value *CastedValue;
 
     for (int i = ScopedNamedValues.size() - 1; i > -1; i--)
@@ -472,7 +476,7 @@ llvm::Value *IfAST::codegen()
     llvm::Value *CondValue = ConditionExpr->codegen();
     llvm::Type *CondType = CondValue->getType();
 
-    CondValue = GetBool(CondValue, CondType, "ifcond");
+    CondValue = GetBool(CondValue, CondType, "ifcond", getTok());
 
     llvm::BasicBlock *TrueBB = llvm::BasicBlock::Create(TheContext, "then", TheFunction);
     llvm::BasicBlock *ElseBB = llvm::BasicBlock::Create(TheContext, "else");
@@ -563,7 +567,7 @@ llvm::Value *WhileAST::codegen()
     Builder.SetInsertPoint(HeaderBB);
 
     CondValue = ConditionExpr->codegen();
-    BoolCondValue = GetBool(CondValue, CondValue->getType(), "whilecond");
+    BoolCondValue = GetBool(CondValue, CondValue->getType(), "whilecond", getTok());
 
     Builder.CreateCondBr(BoolCondValue, LoopBB, ContBB);
 
@@ -1075,7 +1079,7 @@ llvm::Value *CheckLazyOr(TOKEN Op, std::unique_ptr<ExprAST> LHS, std::unique_ptr
     }
 
 	BoolRHS = ImplicitCasting(RHSVal, TypeToLLVM(BOOL_TYPE, Op), Op, "");
-    
+
 	Builder.CreateStore(BoolRHS, tmpAlloca);
 
 	Builder.CreateBr(ContBB);

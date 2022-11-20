@@ -11,6 +11,6 @@ entry:
 
 define i32 @implicit() {
 entry:
-  %calltmp = call i32 @foo(i32 3)
-  ret i32 %calltmp
+  %0 = call i32 @foo(i32 3)
+  ret i32 %0
 }

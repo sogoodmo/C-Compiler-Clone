@@ -757,7 +757,7 @@ std::unique_ptr<IfAST> If_Stmt()
 	std::unique_ptr<ExprAST> condition_expr;
 	std::unique_ptr<BlockAST> true_block;
 	std::unique_ptr<BlockAST> else_block;
-
+	TOKEN prevTok = CurTok;
 	if (CurTok.type == IF)
 	{
 		Match(IF, "Expected: 'if' keyword.");
@@ -775,7 +775,7 @@ std::unique_ptr<IfAST> If_Stmt()
 		throw ParseException("Expected: 'if' keyword.", CurTok.lineNo, CurTok.columnNo);
 	}
 
-	return std::make_unique<IfAST>(std::move(condition_expr), std::move(true_block), std::move(else_block));
+	return std::make_unique<IfAST>(std::move(condition_expr), std::move(true_block), std::move(else_block), prevTok);
 }
 
 // while_stmt ::= "while" "(" expr ")" stmt
@@ -783,6 +783,7 @@ std::unique_ptr<WhileAST> While_Stmt()
 {
 	std::unique_ptr<ExprAST> condition_expr;
 	std::unique_ptr<StmtAST> loop_block;
+	TOKEN prevTok = CurTok;
 
 	if (CurTok.type == WHILE)
 	{
@@ -800,7 +801,7 @@ std::unique_ptr<WhileAST> While_Stmt()
 		throw ParseException("Expected: 'while' keyword.", CurTok.lineNo, CurTok.columnNo);
 	}
 
-	return std::make_unique<WhileAST>(std::move(condition_expr), std::move(loop_block));
+	return std::make_unique<WhileAST>(std::move(condition_expr), std::move(loop_block), prevTok);
 }
 
 // expr_stmt ::= expr ";" | ";"

@@ -108,28 +108,39 @@ class IfAST : public StmtAST
 	std::unique_ptr<ExprAST> ConditionExpr;
 	std::unique_ptr<BlockAST> TrueBlock;
 	std::unique_ptr<BlockAST> ElseBlock;
+	TOKEN tok; 
 
 public:
-	IfAST(std::unique_ptr<ExprAST> ConditionExpr, std::unique_ptr<BlockAST> TrueBlock, std::unique_ptr<BlockAST> ElseBlock)
-		: ConditionExpr(std::move(ConditionExpr)), TrueBlock(std::move(TrueBlock)), ElseBlock(std::move(ElseBlock)) {}
+	IfAST(std::unique_ptr<ExprAST> ConditionExpr, std::unique_ptr<BlockAST> TrueBlock, std::unique_ptr<BlockAST> ElseBlock, TOKEN tok)
+		: ConditionExpr(std::move(ConditionExpr)), TrueBlock(std::move(TrueBlock)), ElseBlock(std::move(ElseBlock)), tok(tok) {}
 
 	virtual void to_string(const std::string &prefix, const std::string &nodeStr, bool isLeft) override;
 
 	llvm::Value *codegen() override;
+	TOKEN getTok()
+	{
+		return tok;
+	}
+
 };
 
 class WhileAST : public StmtAST
 {
 	std::unique_ptr<ExprAST> ConditionExpr;
 	std::unique_ptr<StmtAST> LoopBlock;
+	TOKEN tok;
 
 public:
-	WhileAST(std::unique_ptr<ExprAST> ConditionExpr, std::unique_ptr<StmtAST> LoopBlock)
-		: ConditionExpr(std::move(ConditionExpr)), LoopBlock(std::move(LoopBlock)) {}
+	WhileAST(std::unique_ptr<ExprAST> ConditionExpr, std::unique_ptr<StmtAST> LoopBlock, TOKEN tok)
+		: ConditionExpr(std::move(ConditionExpr)), LoopBlock(std::move(LoopBlock)), tok(tok) {}
 
 	virtual void to_string(const std::string &prefix, const std::string &nodeStr, bool isLeft) override;
 
 	llvm::Value *codegen() override;
+	TOKEN getTok()
+	{
+		return tok;
+	}
 
 };
 

@@ -121,7 +121,7 @@ llvm::AllocaInst *CreateEntryBlockAlloca(llvm::Function *TheFunction, const std:
  * @param type Type of the value of the expression
  * @return llvm::Value*
  */
-llvm::Value *GetBool(llvm::Value *val, llvm::Type *type, std::string loopStr)
+llvm::Value *GetBool(llvm::Value *val, llvm::Type *type, std::string loopStr, TOKEN tok)
 {
 	if (type->isFloatTy())
 	{
@@ -136,7 +136,7 @@ llvm::Value *GetBool(llvm::Value *val, llvm::Type *type, std::string loopStr)
 		return Builder.CreateOr(val, GetConstant(VAR_TYPE::BOOL_TYPE, 0.0f, false), loopStr);
 	}
 
-	throw SemanticException("", -1, -1);
+	throw SemanticException("Cannot have void type in conditional expression.", tok.lineNo, tok.columnNo);
 }
 
 
