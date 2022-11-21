@@ -92,6 +92,7 @@ llvm::Function *FuncDeclAST::codegen()
     llvm::FunctionType *FT;
     llvm::Function *FuncDef;
     std::vector<llvm::Type *> Args;
+    std::unordered_set<std::string> ParamNames; 
 
     bool FuncContainsReturn = false;
 
@@ -123,7 +124,18 @@ llvm::Function *FuncDeclAST::codegen()
         int Idx = 0;
         for (auto &Arg : FuncDef->args())
         {
-            Arg.setName(Params[Idx++]->getIdent().lexeme);
+            std::string curParamName = Params[Idx++]->getIdent().lexeme;
+
+            /**
+             * Checking if a function is being declared with multiple of the same name parameters
+             */
+            if (ParamNames.count(curParamName) != 0)
+            {
+                throw SemanticException("Redefinition of function parameter: " + curParamName, Ident.lineNo, Ident.columnNo);
+            }
+
+            ParamNames.insert(curParamName);
+            Arg.setName(curParamName);
         }
 
         // In the case of __Defining__ an extern function
