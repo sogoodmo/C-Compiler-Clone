@@ -1,11 +1,11 @@
 #!/bin/bash
 set -e
 #export LLVM_INSTALL_PATH=/home/gihan/LLVM/install-10.0.1
-#export LLVM_INSTALL_PATH=/modules/cs325/llvm-8/
-#export LLVM_INSTALL_PATH=/modules/cs325/llvm-10.0.1
-#export LLVM_INSTALL_PATH=/modules/cs325/llvm-12.0.1
+#export LLVM_INSTALL_PATH=/modules/csXXX/llvm-8/
+#export LLVM_INSTALL_PATH=/modules/csXXX/llvm-10.0.1
+#export LLVM_INSTALL_PATH=/modules/csXXX/llvm-12.0.1
 #export LLVM_INSTALL_PATH=/tmp/LLVM/llvm-14.0.6
-export LLVM_INSTALL_PATH=/modules/cs325/llvm-15.0.0
+export LLVM_INSTALL_PATH=/modules/csXXX/llvm-15.0.0
 
 export PATH=$LLVM_INSTALL_PATH/bin:$PATH
 export LD_LIBRARY_PATH=$LLVM_INSTALL_PATH/lib:$LD_LIBRARY_PATH

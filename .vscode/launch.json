@@ -8,8 +8,8 @@
       "args": [],
       "stopAtEntry": false,
       "externalConsole": false,
-      "cwd": "/dcs/20/u2002403/year3/cs325/CS325-CompilerDesign",
-      "program": "/dcs/20/u2002403/year3/cs325/CS325-CompilerDesign/build/Debug/outDebug",
+      "cwd": "/dcs/20/u2002403/year3/csXXX/csXXX-CompilerDesign",
+      "program": "/dcs/20/u2002403/year3/csXXX/csXXX-CompilerDesign/build/Debug/outDebug",
       "MIMode": "gdb",
       "miDebuggerPath": "gdb",
       "setupCommands": [

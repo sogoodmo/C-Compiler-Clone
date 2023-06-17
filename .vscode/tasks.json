@@ -3,7 +3,7 @@
         {
             "type": "cppbuild",
             "label": "C/C++: clang++ build active file",
-            "command": "/modules/cs325/llvm-15.0.0/bin/clang++",
+            "command": "/modules/csXXX/llvm-15.0.0/bin/clang++",
             "args": [
                 "-fcolor-diagnostics",
                 "-fansi-escape-codes",
